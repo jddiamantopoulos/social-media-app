@@ -65,9 +65,14 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
-
 const withModels = require("./db/withModels");
 app.use(withModels);
+
+// simple health check
+app.get("/api/healthz", (_req, res) => {
+  res.status(200).send("ok");
+});
+
 
 app.use("/api", require("./routes/auth"));
 app.use("/api", require("./routes/posts"));
