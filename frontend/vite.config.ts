@@ -7,6 +7,11 @@ export default defineConfig({
     react(),
     viteCommonjs()
   ], 
+    build: {
+    rollupOptions: {
+      external: ['axios']
+    }
+  },
   server: {
     port: 5173,
     strictPort: true,
