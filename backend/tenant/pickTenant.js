@@ -1,18 +1,21 @@
-// db/pickTenant.js
+// tenant/pickTenant.js
 function pickTenant(host = "") {
   const h = String(host || "").toLowerCase();
 
-  // ---- prod subdomains ----
-  if (h.startsWith("friends.cyberscape.com")) return "social_friends";
-  if (h.startsWith("demo.cyberscape.com"))    return "social_demo";
-  if (h.startsWith("app.cyberscape.com"))     return "socialmediaapp";
+  // ----- production subdomains -----
+  // e.g., friends.cyberscape.com, resume.cyberscape.com, app.cyberscape.com
+  if (h.startsWith("friends.")) return "social_friends";
+  if (h.startsWith("resume."))  return "social_resume";
+  if (h.startsWith("app."))     return "social_default"; // main "app" tenant
 
-  // ---- dev helpers ----
+  // ----- dev helpers (localhost) -----
+  // if you sometimes use custom hosts like friends.localhost or resume.localhost
   if (h.startsWith("friends.localhost")) return "social_friends";
-  if (h.startsWith("demo.localhost"))    return "social_demo";
+  if (h.startsWith("resume.localhost"))  return "social_resume";
+  if (h.startsWith("localhost"))         return "social_default";
 
   // Fallback to main DB
-  return "socialmediaapp";
+  return "social_default";
 }
 
 module.exports = { pickTenant };
