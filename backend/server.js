@@ -29,15 +29,6 @@ const cors = require("cors");
 const PORT = process.env.PORT || 5000;
 const app = express();
 
-// ===== CORS (must be before everything else) =====
-const ENV_ALLOWED = (process.env.CLIENT_ORIGIN || "")
-  .split(",")
-  .map(s => s.trim())
-  .filter(Boolean);
-
-// ===== CORS (must be before everything else) =====
-const cors = require("cors");
-
 const ALLOWED = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map(s => s.trim())
