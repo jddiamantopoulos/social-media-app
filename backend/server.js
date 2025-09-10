@@ -2,7 +2,7 @@
 const path = require("path");
 const fs = require("fs");
 
-// Try .env first; fall back to .env.development if present
+// ----- Env loading (same logic you had) -----
 const ENV_PATH = fs.existsSync(path.join(__dirname, ".env"))
   ? path.join(__dirname, ".env")
   : (fs.existsSync(path.join(__dirname, ".env.development"))
@@ -13,9 +13,7 @@ if (!ENV_PATH) {
   console.error("[server] No .env or .env.development file found in backend/");
 } else {
   console.log("[server] Loading env from:", ENV_PATH);
-  // Show whether Node can see the file
   console.log("[server] .env exists?", fs.existsSync(ENV_PATH));
-  // Optional: peek first bytes to catch a BOM
   const firstBytes = fs.readFileSync(ENV_PATH).slice(0, 3);
   console.log("[server] First 3 bytes:", [...firstBytes]);
   require("dotenv").config({ path: ENV_PATH /*, debug: true*/ });
@@ -30,7 +28,7 @@ const cors = require("cors");
 
 const PORT = process.env.PORT || 5000;
 
-// Allowlist: env override + sane dev defaults
+// ----- Build allow-list from env + sensible dev defaults -----
 const ENV_ALLOWED = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map(s => s.trim())
@@ -39,41 +37,64 @@ const ENV_ALLOWED = (process.env.CLIENT_ORIGIN || "")
 const ALLOWED = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  "https://friends.cyberscape.com",
-  "https://demo.cyberscape.com",
-  "https://app.cyberscape.com",
+  // add any stable custom domains you use in prod:
+  // "https://app.cyberscape.com",
+  // "https://friends.cyberscape.com",
+  // "https://resume.cyberscape.com",
   ...ENV_ALLOWED,
 ];
 
-console.log("[server] ENV loaded. Has MONGODB_URI_BASE?", !!process.env.MONGODB_URI_BASE);
+console.log("[server] Allowed origins:", ALLOWED);
 
 const app = express();
 
-app.use(cors({
+// ----- CORS must be FIRST (before json, routes, anything) -----
+const corsOptions = {
   origin: (origin, cb) => {
-    // allow tools with no origin (curl, health checks)
-    if (!origin) return cb(null, true);
+    if (!origin) return cb(null, true); // allow curl/health checks
     if (ALLOWED.includes(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS: " + origin));
+    return cb(new Error("Not allowed by CORS: " + origin), false);
   },
-  credentials: false, // using tokens, not cookies
-}));
+  credentials: true, // set to true if you use cookies; if tokens only, you can set false
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Tenant"],
+};
 
+// Safety net: set ACAO even on early errors/404s for matched origins
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  next();
+});
+
+app.use(cors(corsOptions));
+// Respond to preflight globally
+app.options("*", cors(corsOptions));
+
+// Behind Render’s proxy (needed for secure cookies, IPs, etc.)
+app.set("trust proxy", 1);
+
+// ----- Body parsing AFTER CORS -----
 app.use(express.json());
 
-// Use absolute paths for static dirs to avoid cwd issues
+// ----- Static assets -----
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
+// ----- DB models per-tenant -----
 const withModels = require("./db/withModels");
 app.use(withModels);
 
-// simple health check
+// ----- Health check -----
 app.get("/api/healthz", (_req, res) => {
   res.status(200).send("ok");
 });
 
-
+// ----- Routes -----
 app.use("/api", require("./routes/auth"));
 app.use("/api", require("./routes/posts"));
 app.use("/api", require("./routes/user"));
@@ -82,4 +103,5 @@ app.use("/api", require("./routes/notification"));
 app.use("/api", require("./routes/settings"));
 app.use("/api", require("./routes/messages"));
 
+// ----- Start -----
 app.listen(PORT, () => console.log(`API listening on :${PORT}`));
