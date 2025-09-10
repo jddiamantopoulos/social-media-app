@@ -28,7 +28,9 @@ const cors = require("cors");
 
 const PORT = process.env.PORT || 5000;
 
-// ----- Build allow-list from env + sensible dev defaults -----
+const app = express();
+
+// ----- CORS must be FIRST (before json, routes, anything) -----
 const ENV_ALLOWED = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map(s => s.trim())
@@ -37,30 +39,20 @@ const ENV_ALLOWED = (process.env.CLIENT_ORIGIN || "")
 const ALLOWED = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  // add any stable custom domains you use in prod:
-  // "https://app.cyberscape.com",
-  // "https://friends.cyberscape.com",
-  // "https://resume.cyberscape.com",
   ...ENV_ALLOWED,
 ];
 
-console.log("[server] Allowed origins:", ALLOWED);
-
-const app = express();
-
-// ----- CORS must be FIRST (before json, routes, anything) -----
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // allow curl/health checks
+    if (!origin) return cb(null, true);            // curl/health checks
     if (ALLOWED.includes(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS: " + origin), false);
   },
-  credentials: true, // set to true if you use cookies; if tokens only, you can set false
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Tenant"],
+  credentials: true,
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization","X-Tenant"],
 };
 
-// Safety net: set ACAO even on early errors/404s for matched origins
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ALLOWED.includes(origin)) {
@@ -72,6 +64,20 @@ app.use((req, res, next) => {
 });
 
 app.use(cors(corsOptions));
+
+// ✅ Express 5-friendly preflight handler (no bare "*")
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    // Mirror CORS config on preflight
+    const reqHeaders = req.headers["access-control-request-headers"] || "";
+    const reqMethod = req.headers["access-control-request-method"] || "GET";
+    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    if (reqHeaders) res.header("Access-Control-Allow-Headers", reqHeaders);
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 // Respond to preflight globally
 app.options("*", cors(corsOptions));
 
