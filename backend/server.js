@@ -35,30 +35,26 @@ const ENV_ALLOWED = (process.env.CLIENT_ORIGIN || "")
   .map(s => s.trim())
   .filter(Boolean);
 
-const ALLOWED = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  // add your stable prod domains here (no trailing slash, no paths):
-  // "https://app.cyberscape.com",
-  // "https://friends.cyberscape.com",
-  // "https://resume.cyberscape.com",
-  ...ENV_ALLOWED,
-];
+// ===== CORS (must be before everything else) =====
+const cors = require("cors");
 
-console.log("[server] Allowed origins:", ALLOWED);
+const ALLOWED = (process.env.CLIENT_ORIGIN || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
 
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true);                  // allow curl/healthchecks
-    if (ALLOWED.includes(origin)) return cb(null, true); // exact origin match
+    if (!origin) return cb(null, true);                 // curl/health checks
+    if (ALLOWED.includes(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS: " + origin), false);
   },
-  credentials: true,  // true if you might use cookies; fine with token auth too
+  credentials: true, // ok even if you use JWT in JSON only
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
   allowedHeaders: ["Content-Type","Authorization","X-Tenant"],
 };
 
-// Safety net so even early errors/404s include ACAO for allowed origins
+// Always set ACAO for allowed origins (even on errors/404)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ALLOWED.includes(origin)) {
@@ -71,7 +67,7 @@ app.use((req, res, next) => {
 
 app.use(cors(corsOptions));
 
-// Express 5–friendly preflight handler (no bare "*")
+// Express 5-friendly preflight handler (no "*" routes)
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     const reqHeaders = req.headers["access-control-request-headers"] || "";
