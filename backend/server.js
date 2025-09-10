@@ -2,7 +2,7 @@
 const path = require("path");
 const fs = require("fs");
 
-// ----- Env loading (same logic you had) -----
+// ----- Env loading -----
 const ENV_PATH = fs.existsSync(path.join(__dirname, ".env"))
   ? path.join(__dirname, ".env")
   : (fs.existsSync(path.join(__dirname, ".env.development"))
@@ -27,10 +27,9 @@ const express = require("express");
 const cors = require("cors");
 
 const PORT = process.env.PORT || 5000;
-
 const app = express();
 
-// ----- CORS must be FIRST (before json, routes, anything) -----
+// ===== CORS (must be before everything else) =====
 const ENV_ALLOWED = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map(s => s.trim())
@@ -39,20 +38,27 @@ const ENV_ALLOWED = (process.env.CLIENT_ORIGIN || "")
 const ALLOWED = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  // add your stable prod domains here (no trailing slash, no paths):
+  // "https://app.cyberscape.com",
+  // "https://friends.cyberscape.com",
+  // "https://resume.cyberscape.com",
   ...ENV_ALLOWED,
 ];
 
+console.log("[server] Allowed origins:", ALLOWED);
+
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true);            // curl/health checks
-    if (ALLOWED.includes(origin)) return cb(null, true);
+    if (!origin) return cb(null, true);                  // allow curl/healthchecks
+    if (ALLOWED.includes(origin)) return cb(null, true); // exact origin match
     return cb(new Error("Not allowed by CORS: " + origin), false);
   },
-  credentials: true,
+  credentials: true,  // true if you might use cookies; fine with token auth too
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
   allowedHeaders: ["Content-Type","Authorization","X-Tenant"],
 };
 
+// Safety net so even early errors/404s include ACAO for allowed origins
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ALLOWED.includes(origin)) {
@@ -65,12 +71,10 @@ app.use((req, res, next) => {
 
 app.use(cors(corsOptions));
 
-// ✅ Express 5-friendly preflight handler (no bare "*")
+// Express 5–friendly preflight handler (no bare "*")
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
-    // Mirror CORS config on preflight
     const reqHeaders = req.headers["access-control-request-headers"] || "";
-    const reqMethod = req.headers["access-control-request-method"] || "GET";
     res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
     if (reqHeaders) res.header("Access-Control-Allow-Headers", reqHeaders);
     return res.sendStatus(204);
@@ -78,10 +82,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Respond to preflight globally
-app.options("*", cors(corsOptions));
+// DO NOT use: app.options("*", ...)  // <- this crashes on Express 5
 
-// Behind Render’s proxy (needed for secure cookies, IPs, etc.)
+// Behind Render’s proxy (needed for secure cookies, correct IPs)
 app.set("trust proxy", 1);
 
 // ----- Body parsing AFTER CORS -----
