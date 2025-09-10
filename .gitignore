@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+.vite/
+
+# local env
+.env
+.env.*
+uploads/
+
+# OS/editor junk
+.DS_Store
+Thumbs.db

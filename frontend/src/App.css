@@ -1,0 +1,39 @@
+/* Make common surfaces follow the theme vars */
+.card,
+.card-header,
+.card-footer,
+.dropdown-menu,
+.modal-content,
+.offcanvas,
+.list-group-item,
+.form-control {
+  background-color: var(--bs-card-bg) !important;
+  color: var(--bs-body-color);
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Buttons and links follow the chosen primary */
+.btn-primary{
+  --bs-btn-bg: var(--bs-primary);
+  --bs-btn-border-color: var(--bs-primary);
+  --bs-btn-hover-bg: var(--bs-primary-hover);
+  --bs-btn-hover-border-color: var(--bs-primary-hover);
+}
+a { color: var(--bs-link-color); }
+a:hover { color: var(--bs-link-hover-color); }
+
+/* Navbar accents use the chosen primary */
+.navbar .nav-link.active,
+.navbar .nav-link:hover,
+.navbar .nav-link:focus,
+.navbar .navbar-brand {
+  color: var(--bs-primary) !important;
+}
+
+/* Buttons already mapped; keep this if you added it earlier */
+.btn-primary{
+  --bs-btn-bg: var(--bs-primary);
+  --bs-btn-border-color: var(--bs-primary);
+  --bs-btn-hover-bg: var(--bs-primary-hover);
+  --bs-btn-hover-border-color: var(--bs-primary-hover);
+}
