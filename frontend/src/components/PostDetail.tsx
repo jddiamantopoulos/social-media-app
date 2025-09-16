@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { timeAgo } from "../utils/timeAgo";
 import PostNotFound from "./PostNotFound";
+import { fileUrl } from "../lib/files";
 
 interface UserRef {
   _id: string;
@@ -270,7 +271,7 @@ const PostDetail: React.FC = () => {
             className="d-flex align-items-center text-decoration-none"
           >
             <img
-              src={post.user.photoUrl}
+              src={fileUrl(post.user.photoUrl)}
               alt=""
               className="rounded-circle me-2"
               style={{ width: 32, height: 32, objectFit: "cover" }}
@@ -332,7 +333,7 @@ const PostDetail: React.FC = () => {
         </div>
 
         {post.imageUrl && (
-          <img src={post.imageUrl} className="card-img-bottom" alt="" />
+          <img src={fileUrl(post.imageUrl)} className="card-img-bottom" alt="" />
         )}
 
         <div className="card-footer d-flex justify-content-between align-items-center">
