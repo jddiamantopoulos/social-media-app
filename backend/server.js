@@ -34,10 +34,17 @@ const ALLOWED = (process.env.CLIENT_ORIGIN || "")
   .map(s => s.trim())
   .filter(Boolean);
 
+// ★ Allow any Vercel preview subdomain (previews change every deploy)
+const isVercelPreview = (origin = "") => {
+  try { return new URL(origin).host.endsWith(".vercel.app"); }
+  catch { return false; }
+};
+
 const corsOptions = {
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);                 // curl/health checks
-    if (ALLOWED.includes(origin)) return cb(null, true);
+    // ★ allow list OR any *.vercel.app preview
+    if (ALLOWED.includes(origin) || isVercelPreview(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS: " + origin), false);
   },
   credentials: true, // ok even if you use JWT in JSON only
@@ -47,8 +54,9 @@ const corsOptions = {
 
 // Always set ACAO for allowed origins (even on errors/404)
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && ALLOWED.includes(origin)) {
+  const origin = req.headers.origin || "";
+  // ★ mirror the same rule here
+  if (origin && (ALLOWED.includes(origin) || isVercelPreview(origin))) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Credentials", "true");
