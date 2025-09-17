@@ -587,6 +587,10 @@ const Home: React.FC = () => {
       </p>
     </div>
   );
+  
+  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const imgSrc = (u?: string) =>
+    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
 
   return (
     <div className="container" style={{ paddingTop: "56px" }}>
@@ -628,7 +632,7 @@ const Home: React.FC = () => {
                   className="d-flex align-items-center text-decoration-none"
                 >
                   <img
-                    src={post.user.photoUrl}
+                    src={imgSrc(post.user.photoUrl)}
                     alt=""
                     className="rounded-circle me-2"
                     style={{ width: 32, height: 32, objectFit: "cover" }}
@@ -697,7 +701,7 @@ const Home: React.FC = () => {
 
               {post.imageUrl && (
                 <img
-                  src={post.imageUrl}
+                  src={imgSrc(post.imageUrl)}
                   className="card-img-bottom"
                   alt=""
                   loading="lazy"

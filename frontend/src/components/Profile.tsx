@@ -457,6 +457,10 @@ const Profile: React.FC = () => {
       <p className="text-muted mb-3">Create a post with the post button.</p>
     </div>
   );
+  
+  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const imgSrc = (u?: string) =>
+    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
 
   const ListOverlay: React.FC<{
     title: string;
@@ -619,7 +623,7 @@ const Profile: React.FC = () => {
                   onClick={onClose}
                 >
                   <img
-                    src={u.photoUrl}
+                    src={imgSrc(u.photoUrl)}
                     alt=""
                     className="rounded-circle me-2"
                     style={{ width: 32, height: 32, objectFit: "cover" }}
@@ -671,7 +675,7 @@ const Profile: React.FC = () => {
           {/* Avatar + camera button */}
           <div className="avatar-wrap">
             <img
-              src={photoUrl}
+              src={imgSrc(photoUrl)}
               alt="avatar"
               className="avatar-img"
               onError={(e) => {
@@ -807,7 +811,7 @@ const Profile: React.FC = () => {
                   className="d-flex align-items-center text-decoration-none"
                 >
                   <img
-                    src={post.user.photoUrl}
+                    src={imgSrc(post.user.photoUrl)}
                     alt=""
                     className="rounded-circle me-2"
                     style={{ width: 32, height: 32, objectFit: "cover" }}
@@ -867,7 +871,7 @@ const Profile: React.FC = () => {
               </div>
 
               {post.imageUrl && (
-                <img src={post.imageUrl} className="card-img-bottom" alt="" />
+                <img src={imgSrc(post.imageUrl)} className="card-img-bottom" alt="" />
               )}
 
               {/* Reactions */}

@@ -2,8 +2,6 @@
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/verifyToken");
-const multer = require("multer");
-const upload = multer({ dest: "uploads/" });
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
@@ -37,41 +35,37 @@ function removeFileIfExists(fileUrl) {
   fs.unlink(full, () => {});
 }
 
+function removeLocalIfUploadsPath(fileUrl) {
+  if (!fileUrl || !fileUrl.startsWith("/uploads/")) return;
+  const full = path.join(process.cwd(), fileUrl.replace(/^\//, ""));
+  fs.unlink(full, () => {});
+}
+
 /* =========================
  *          POSTS
  * ======================= */
 
 // CREATE post
-router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
+router.put("/posts/:id", verifyToken, async (req, res) => {
   try {
-    const { Post, User, Notification } = getM(req);
-    const meId = req.user.id;
+    const { Post } = getM(req);
 
-    const description = (req.body.description || "").trim();
-    let imageUrl = req.body.imageUrl || null;
-    if (req.file) imageUrl = `/uploads/${req.file.filename}`;
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (post.user.toString() !== req.user.id)
+      return res.status(403).json({ message: "Not authorized" });
 
-    const post = await Post.create({ user: meId, description, imageUrl });
+    const { description, imageUrl } = req.body;
+    if (typeof description === "string") post.description = description.trim();
 
-    try {
-      const u = await User.findById(meId).select("followers");
-      const followers = (u?.followers || [])
-        .map(String)
-        .filter((fid) => fid !== String(meId));
-      if (followers.length) {
-        await Notification.insertMany(
-          followers.map((fid) => ({
-            recipient: fid,
-            actor: meId,
-            type: "new_post",
-            post: post._id,
-          })),
-          { ordered: false }
-        );
-      }
-    } catch (e) {
-      console.warn("notify followers failed:", e);
+    if (typeof imageUrl === "string" && imageUrl.trim()) {
+      // optional cleanup of old local file if you used disk before
+      removeLocalIfUploadsPath(post.imageUrl);
+      post.imageUrl = imageUrl.trim(); // Cloudinary absolute URL
     }
+
+    post.editedAt = new Date();
+    await post.save();
 
     const populated = await Post.findById(post._id)
       .populate("user", "username photoUrl")
@@ -79,9 +73,9 @@ router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
       .populate("comments.replies.user", "username photoUrl")
       .populate("comments.replies.replyTo", "username photoUrl");
 
-    res.status(201).json(populated);
+    res.json({ message: "Post updated", post: populated });
   } catch (err) {
-    console.error("Create post error:", err);
+    console.error("Update post error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -161,7 +155,7 @@ router.put("/posts/:id", verifyToken, upload.single("image"), async (req, res) =
     if (typeof description === "string") post.description = description;
 
     if (req.file) {
-      if (post.imageUrl) removeFileIfExists(post.imageUrl);
+      if (post.imageUrl) removeLocalIfUploadsPath(post.imageUrl);
       post.imageUrl = `/uploads/${req.file.filename}`;
     }
 
@@ -191,7 +185,7 @@ router.delete("/posts/:id", verifyToken, async (req, res) => {
     if (post.user.toString() !== req.user.id)
       return res.status(403).json({ message: "Not authorized" });
 
-    if (post.imageUrl) removeFileIfExists(post.imageUrl);
+    if (post.imageUrl) removeLocalIfUploadsPath(post.imageUrl);
     await post.deleteOne();
     res.json({ message: "Post deleted" });
   } catch (err) {

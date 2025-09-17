@@ -707,6 +707,10 @@ const NavBar: React.FC = () => {
       setOpen(false);
     }
   };
+  
+  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const imgSrc = (u?: string) =>
+    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
 
   const renderItem = (item: SearchItem, idx: number) => {
     const isActive = idx === highlight;
@@ -724,7 +728,7 @@ const NavBar: React.FC = () => {
           onClick={() => go(item)}
         >
           <img
-            src={item.photoUrl}
+            src={imgSrc(item.photoUrl)}
             alt=""
             className="rounded-circle me-2"
             style={{ width: 28, height: 28, objectFit: "cover", flexShrink: 0 }}
@@ -751,7 +755,7 @@ const NavBar: React.FC = () => {
       >
         {item.imageUrl ? (
           <img
-            src={item.imageUrl}
+            src={imgSrc(item.imageUrl)}
             alt=""
             className="me-2 rounded"
             style={{ width: 36, height: 24, objectFit: "cover", flexShrink: 0 }}
@@ -1070,7 +1074,7 @@ const NavBar: React.FC = () => {
                               style={{ whiteSpace: "normal" }}
                             >
                               <img
-                                src={n.actor?.photoUrl || "/default-avatar.png"}
+                                src={imgSrc(n.actor?.photoUrl) || "/default-avatar.png"}
                                 alt=""
                                 className="rounded-circle me-2"
                                 style={{
@@ -1103,7 +1107,7 @@ const NavBar: React.FC = () => {
                               </div>
                               {n.post?.imageUrl ? (
                                 <img
-                                  src={n.post.imageUrl}
+                                  src={imgSrc(n.post.imageUrl)}
                                   alt=""
                                   className="ms-2 rounded"
                                   style={{
@@ -1419,7 +1423,7 @@ const NavBar: React.FC = () => {
                           style={{ whiteSpace: "normal" }}
                         >
                           <img
-                            src={n.actor?.photoUrl || "/default-avatar.png"}
+                            src={imgSrc(n.actor?.photoUrl) || "/default-avatar.png"}
                             alt=""
                             className="rounded-circle me-2"
                             style={{
@@ -1449,7 +1453,7 @@ const NavBar: React.FC = () => {
 
                           {n.post?.imageUrl ? (
                             <img
-                              src={n.post.imageUrl}
+                              src={imgSrc(n.post.imageUrl)}
                               alt=""
                               className="ms-2 rounded"
                               style={{

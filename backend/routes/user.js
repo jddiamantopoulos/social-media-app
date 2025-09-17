@@ -2,49 +2,44 @@
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/verifyToken");
-const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// --- helpers ---
-function ensureDir(dir) {
-  try { fs.mkdirSync(dir, { recursive: true }); } catch {}
-}
+// --- helpers: only delete if it was a local file previously ---
 function removeFileIfLocal(url) {
-  if (!url || !url.startsWith("/uploads/")) return;
+  if (!url || !url.startsWith("/uploads/")) return;   // ignore Cloudinary URLs
   const abs = path.join(process.cwd(), url.replace(/^\//, ""));
   fs.stat(abs, (err, st) => { if (!err && st.isFile()) fs.unlink(abs, () => {}); });
 }
 
-// store avatars in uploads/avatars
-const AVATAR_DIR = "uploads/avatars";
-ensureDir(AVATAR_DIR);
+// --- simple URL check (accept http/https only) ---
+function isHttpUrl(s = "") {
+  return /^https?:\/\//i.test(String(s).trim());
+}
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, AVATAR_DIR),
-  filename: (req, file, cb) => {
-    // verifyToken runs before multer on this route, so req.user.id is available
-    const ext = path.extname(file.originalname || "").toLowerCase();
-    cb(null, req.user.id + ext);
-  },
-});
-const upload = multer({ storage });
-
-/** POST /api/user/avatar */
-router.post("/user/avatar", verifyToken, upload.single("avatar"), async (req, res) => {
+/** POST /api/user/avatar
+ *  Body: { photoUrl: "https://res.cloudinary.com/<cloud>/image/upload/...jpg" }
+ *  Replaces previous local avatar (if any) and saves the new absolute URL.
+ */
+router.post("/user/avatar", verifyToken, async (req, res) => {
   try {
-    const { User } = req.models;              // get models from the request
-    const u = await User.findById(req.user.id).select("photoUrl");
-    if (!u) return res.status(404).json({ message: "User not found" });
+    const { User } = req.models;
+    const raw = String(req.body?.photoUrl || "").trim();
+    if (!raw) return res.status(400).json({ message: "photoUrl is required." });
+    if (!isHttpUrl(raw)) return res.status(400).json({ message: "photoUrl must be an absolute http(s) URL." });
 
-    // remove previous local avatar if any
-    removeFileIfLocal(u.photoUrl);
+    const me = await User.findById(req.user.id).select("photoUrl username");
+    if (!me) return res.status(404).json({ message: "User not found" });
 
-    u.photoUrl = `/uploads/avatars/${req.file.filename}`;
-    await u.save();
-    res.json({ photoUrl: u.photoUrl });
+    // clean up old local file if we used disk before
+    removeFileIfLocal(me.photoUrl);
+
+    me.photoUrl = raw; // Cloudinary absolute URL
+    await me.save();
+
+    res.json({ message: "Avatar updated.", photoUrl: me.photoUrl });
   } catch (err) {
-    console.error("Avatar upload error:", err);
+    console.error("Avatar update error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

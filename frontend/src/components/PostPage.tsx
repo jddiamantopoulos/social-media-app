@@ -138,6 +138,10 @@ const PostPage: React.FC = () => {
       setSubmitting(false);
     }
   };
+  
+  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const imgSrc = (u?: string) =>
+    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
 
   return (
     <div className="container" style={{ paddingTop: 56 }}>
@@ -290,7 +294,7 @@ const PostPage: React.FC = () => {
               >
                 {previewUrl ? (
                   <img
-                    src={previewUrl}
+                    src={imgSrc(previewUrl)}
                     alt="Preview"
                     className="image-preview"
                   />

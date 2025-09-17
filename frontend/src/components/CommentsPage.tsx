@@ -867,6 +867,10 @@ const CommentsPage: React.FC = () => {
     return [...items].sort((a, b) => rank(a) - rank(b));
   }, [items, frozenOrder]);
 
+  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const imgSrc = (u?: string) =>
+    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
+
   return (
     <div
       className="co-overlay"
@@ -965,7 +969,7 @@ const CommentsPage: React.FC = () => {
                     style={{ flex: "0 0 auto" }}
                   >
                     <img
-                      src={c.user.photoUrl}
+                      src={imgSrc(c.user.photoUrl)}
                       alt=""
                       className="rounded-circle"
                       style={{ width: 32, height: 32, objectFit: "cover" }}
@@ -1150,7 +1154,7 @@ const CommentsPage: React.FC = () => {
                                   style={{ flex: "0 0 auto" }}
                                 >
                                   <img
-                                    src={r.user.photoUrl}
+                                    src={imgSrc(r.user.photoUrl)}
                                     alt=""
                                     className="rounded-circle"
                                     style={{

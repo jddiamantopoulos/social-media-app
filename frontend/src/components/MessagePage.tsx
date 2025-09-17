@@ -674,6 +674,10 @@ const MessagePage: React.FC = () => {
     );
   }
 
+  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const imgSrc = (u?: string) =>
+    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
+
   /** --------------- INBOX UI (/messages) --------------- */
   if (!conversationId) {
     return (
@@ -745,7 +749,7 @@ const MessagePage: React.FC = () => {
                           style={{ gap: 12 }}
                         >
                           <img
-                            src={other?.photoUrl || "/default-avatar.png"}
+                            src={imgSrc(other?.photoUrl) || "/default-avatar.png"}
                             alt=""
                             className="avatar"
                             onError={(e) => {
@@ -810,7 +814,7 @@ const MessagePage: React.FC = () => {
                   title={`Open ${otherUser.username}'s profile`}
                 >
                   <img
-                    src={otherUser.photoUrl || "/default-avatar.png"}
+                    src={imgSrc(otherUser.photoUrl) || "/default-avatar.png"}
                     alt={`${otherUser.username}'s avatar`}
                     className="avatar-sm"
                     onError={(e) => {

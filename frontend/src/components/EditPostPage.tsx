@@ -201,6 +201,10 @@ const EditPostPage: React.FC = () => {
   // Prefer new preview, else show current image if present
   const effectivePreview = previewUrl || currentImageUrl || null;
 
+  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const imgSrc = (u?: string) =>
+    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
+
   return (
     <div className="container" style={{ paddingTop: 56 }}>
       <style>{`
@@ -352,7 +356,7 @@ const EditPostPage: React.FC = () => {
               >
                 {effectivePreview ? (
                   <img
-                    src={effectivePreview}
+                    src={imgSrc(effectivePreview)}
                     alt="Preview"
                     className="image-preview"
                   />

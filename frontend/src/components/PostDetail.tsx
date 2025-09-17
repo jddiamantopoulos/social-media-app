@@ -257,6 +257,12 @@ const PostDetail: React.FC = () => {
   const liked = me.id ? post.likes.includes(me.id) : false;
   const disliked = me.id ? post.dislikes.includes(me.id) : false;
   const profileLink = isMe ? "/profile" : `/users/${post.user._id}`;
+  
+  // turn "/uploads/x.jpg" into "https://your-backend.onrender.com/uploads/x.jpg"
+  // leave Cloudinary (https://...) URLs unchanged
+  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+  const imgSrc = (u?: string) =>
+    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
 
   return (
     <div className="container" style={{ paddingTop: "56px" }}>
@@ -270,7 +276,7 @@ const PostDetail: React.FC = () => {
             className="d-flex align-items-center text-decoration-none"
           >
             <img
-              src={post.user.photoUrl}
+              src={imgSrc(post.user.photoUrl)}
               alt=""
               className="rounded-circle me-2"
               style={{ width: 32, height: 32, objectFit: "cover" }}
@@ -332,7 +338,7 @@ const PostDetail: React.FC = () => {
         </div>
 
         {post.imageUrl && (
-          <img src={post.imageUrl} className="card-img-bottom" alt="" />
+          <img src={imgSrc(post.imageUrl)} className="card-img-bottom" alt="" />
         )}
 
         <div className="card-footer d-flex justify-content-between align-items-center">
