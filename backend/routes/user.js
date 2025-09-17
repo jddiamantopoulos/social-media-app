@@ -21,7 +21,7 @@ function isHttpUrl(s = "") {
  *  Body: { photoUrl: "https://res.cloudinary.com/<cloud>/image/upload/...jpg" }
  *  Replaces previous local avatar (if any) and saves the new absolute URL.
  */
-router.post("/user/avatar", verifyToken, upload.single("avatar"), async (req, res) => {
+router.post("/user/avatar", verifyToken, async (req, res) => {
   try {
     const { User } = req.models;
 
