@@ -5,6 +5,9 @@ const verifyToken = require("../middleware/verifyToken");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
+const multer = require("multer");
+const upload = multer({ dest: "tmp/" });
+const { cloudinary } = require("../lib/cloudinary");
 
 // -------- tenant model accessor --------
 const getM = (req) => req.models; // { Post, User, Notification }
@@ -26,15 +29,6 @@ const decodeCursor = (s) => {
   };
 };
 
-function removeFileIfExists(fileUrl) {
-  if (!fileUrl) return;
-  const full = path.join(
-    process.cwd(),
-    fileUrl.startsWith("/") ? fileUrl.slice(1) : fileUrl
-  );
-  fs.unlink(full, () => {});
-}
-
 function removeLocalIfUploadsPath(fileUrl) {
   if (!fileUrl || !fileUrl.startsWith("/uploads/")) return;
   const full = path.join(process.cwd(), fileUrl.replace(/^\//, ""));
@@ -45,27 +39,44 @@ function removeLocalIfUploadsPath(fileUrl) {
  *          POSTS
  * ======================= */
 
-// CREATE post
-router.put("/posts/:id", verifyToken, async (req, res) => {
+// CREATE post (supports either: multipart "image" OR JSON { imageUrl })
+router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
   try {
-    const { Post } = getM(req);
+    const { Post, User, Notification } = getM(req);
+    const meId = req.user.id;
 
-    const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: "Post not found" });
-    if (post.user.toString() !== req.user.id)
-      return res.status(403).json({ message: "Not authorized" });
+    const description = (req.body.description || "").trim();
+    let imageUrl = (req.body.imageUrl || "").trim() || null;
 
-    const { description, imageUrl } = req.body;
-    if (typeof description === "string") post.description = description.trim();
-
-    if (typeof imageUrl === "string" && imageUrl.trim()) {
-      // optional cleanup of old local file if you used disk before
-      removeLocalIfUploadsPath(post.imageUrl);
-      post.imageUrl = imageUrl.trim(); // Cloudinary absolute URL
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: `${process.env.CLOUDINARY_FOLDER || "social-media"}/posts`,
+        // optional: public_id: `post_${Date.now()}`
+      });
+      imageUrl = result.secure_url;
+      try { fs.unlink(req.file.path, () => {}); } catch {}
     }
 
-    post.editedAt = new Date();
-    await post.save();
+    const post = await Post.create({ user: meId, description, imageUrl });
+
+    // (optional) notify followers — keep your existing logic if you want
+    try {
+      const u = await User.findById(meId).select("followers");
+      const followers = (u?.followers || []).map(String).filter(fid => fid !== String(meId));
+      if (followers.length) {
+        await Notification.insertMany(
+          followers.map(fid => ({
+            recipient: fid,
+            actor: meId,
+            type: "new_post",
+            post: post._id,
+          })),
+          { ordered: false }
+        );
+      }
+    } catch (e) {
+      console.warn("notify followers failed:", e);
+    }
 
     const populated = await Post.findById(post._id)
       .populate("user", "username photoUrl")
@@ -73,9 +84,9 @@ router.put("/posts/:id", verifyToken, async (req, res) => {
       .populate("comments.replies.user", "username photoUrl")
       .populate("comments.replies.replyTo", "username photoUrl");
 
-    res.json({ message: "Post updated", post: populated });
+    res.status(201).json(populated);
   } catch (err) {
-    console.error("Update post error:", err);
+    console.error("Create post error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -155,10 +166,21 @@ router.put("/posts/:id", verifyToken, upload.single("image"), async (req, res) =
     if (typeof description === "string") post.description = description;
 
     if (req.file) {
-      if (post.imageUrl) removeLocalIfUploadsPath(post.imageUrl);
-      post.imageUrl = `/uploads/${req.file.filename}`;
+      // remove old local-only file if you had one
+      removeLocalIfUploadsPath(post.imageUrl);
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: `${process.env.CLOUDINARY_FOLDER || "social-media"}/posts`,
+        // optional: public_id: `post_${post._id}`, overwrite: true
+      });
+      post.imageUrl = result.secure_url;
+      try { fs.unlink(req.file.path, () => {}); } catch {}
+    } else if (typeof req.body.imageUrl === "string" && req.body.imageUrl.trim()) {
+      // allow swapping to a new Cloudinary URL without uploading a new file
+      removeLocalIfUploadsPath(post.imageUrl);
+      post.imageUrl = req.body.imageUrl.trim();
     }
 
+    if (typeof description === "string") post.description = description.trim();
     post.editedAt = new Date();
     await post.save();
 

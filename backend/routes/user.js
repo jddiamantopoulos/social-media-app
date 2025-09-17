@@ -21,20 +21,38 @@ function isHttpUrl(s = "") {
  *  Body: { photoUrl: "https://res.cloudinary.com/<cloud>/image/upload/...jpg" }
  *  Replaces previous local avatar (if any) and saves the new absolute URL.
  */
-router.post("/user/avatar", verifyToken, async (req, res) => {
+router.post("/user/avatar", verifyToken, upload.single("avatar"), async (req, res) => {
   try {
     const { User } = req.models;
-    const raw = String(req.body?.photoUrl || "").trim();
-    if (!raw) return res.status(400).json({ message: "photoUrl is required." });
-    if (!isHttpUrl(raw)) return res.status(400).json({ message: "photoUrl must be an absolute http(s) URL." });
+
+    let photoUrlFromClient = String(req.body?.photoUrl || "").trim();
+    let finalPhotoUrl = "";
+
+    if (req.file) {
+      // Upload the received file to Cloudinary
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: `${process.env.CLOUDINARY_FOLDER || "social-media"}/avatars`,
+        public_id: req.user.id,     // stable per-user name
+        overwrite: true,
+      });
+      finalPhotoUrl = result.secure_url;
+    } else {
+      if (!photoUrlFromClient) {
+        return res.status(400).json({ message: "Either 'avatar' file or 'photoUrl' is required." });
+      }
+      if (!isHttpUrl(photoUrlFromClient)) {
+        return res.status(400).json({ message: "photoUrl must be an absolute http(s) URL." });
+      }
+      finalPhotoUrl = photoUrlFromClient;
+    }
 
     const me = await User.findById(req.user.id).select("photoUrl username");
     if (!me) return res.status(404).json({ message: "User not found" });
 
-    // clean up old local file if we used disk before
+    // remove old local disk file (noop for Cloudinary URLs)
     removeFileIfLocal(me.photoUrl);
-
-    me.photoUrl = raw; // Cloudinary absolute URL
+    me.photoUrl = finalPhotoUrl;
+    if (req.file) { try { fs.unlink(req.file.path, () => {}); } catch {} }
     await me.save();
 
     res.json({ message: "Avatar updated.", photoUrl: me.photoUrl });
