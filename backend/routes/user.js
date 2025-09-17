@@ -21,43 +21,31 @@ function isHttpUrl(s = "") {
  *  Body: { photoUrl: "https://res.cloudinary.com/<cloud>/image/upload/...jpg" }
  *  Replaces previous local avatar (if any) and saves the new absolute URL.
  */
-router.post("/user/avatar", verifyToken, async (req, res) => {
+router.post("/user/avatar", verifyToken, upload.single("avatar"), async (req, res) => {
   try {
     const { User } = req.models;
-
-    let photoUrlFromClient = String(req.body?.photoUrl || "").trim();
-    let finalPhotoUrl = "";
-
-    if (req.file) {
-      // Upload the received file to Cloudinary
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: `${process.env.CLOUDINARY_FOLDER || "social-media"}/avatars`,
-        public_id: req.user.id,     // stable per-user name
-        overwrite: true,
-      });
-      finalPhotoUrl = result.secure_url;
-    } else {
-      if (!photoUrlFromClient) {
-        return res.status(400).json({ message: "Either 'avatar' file or 'photoUrl' is required." });
-      }
-      if (!isHttpUrl(photoUrlFromClient)) {
-        return res.status(400).json({ message: "photoUrl must be an absolute http(s) URL." });
-      }
-      finalPhotoUrl = photoUrlFromClient;
-    }
-
-    const me = await User.findById(req.user.id).select("photoUrl username");
+    const me = await User.findById(req.user.id).select("photoUrl");
     if (!me) return res.status(404).json({ message: "User not found" });
 
-    // remove old local disk file (noop for Cloudinary URLs)
-    removeFileIfLocal(me.photoUrl);
-    me.photoUrl = finalPhotoUrl;
-    if (req.file) { try { fs.unlink(req.file.path, () => {}); } catch {} }
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+    // 1) Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: `${process.env.CLOUDINARY_FOLDER || "social-media-app"}/avatars`,
+      public_id: req.user.id,  // stable name per user (optional)
+      overwrite: true,
+    });
+
+    // 2) Clean up temp file
+    try { fs.unlink(req.file.path, () => {}); } catch {}
+
+    // 3) Save URL
+    me.photoUrl = result.secure_url;
     await me.save();
 
-    res.json({ message: "Avatar updated.", photoUrl: me.photoUrl });
+    res.json({ photoUrl: me.photoUrl });
   } catch (err) {
-    console.error("Avatar update error:", err);
+    console.error("Avatar upload error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

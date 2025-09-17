@@ -356,7 +356,7 @@ const EditPostPage: React.FC = () => {
               >
                 {effectivePreview ? (
                   <img
-                    src={imgSrc(effectivePreview)}
+                    src={effectivePreview}
                     alt="Preview"
                     className="image-preview"
                   />

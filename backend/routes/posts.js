@@ -46,26 +46,35 @@ router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
     const meId = req.user.id;
 
     const description = (req.body.description || "").trim();
+
+    // If client provided a full URL, accept it; otherwise, if a file was sent, upload to Cloudinary.
     let imageUrl = (req.body.imageUrl || "").trim() || null;
 
     if (req.file) {
+      // Upload temp file to Cloudinary
       const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: `${process.env.CLOUDINARY_FOLDER || "social-media"}/posts`,
-        // optional: public_id: `post_${Date.now()}`
+        folder: `${process.env.CLOUDINARY_FOLDER || "social-media-app"}/posts`,
+        // optional:
+        // public_id: `post_${Date.now()}`,
+        // overwrite: true,
       });
       imageUrl = result.secure_url;
+
+      // Clean up temp file
       try { fs.unlink(req.file.path, () => {}); } catch {}
     }
 
     const post = await Post.create({ user: meId, description, imageUrl });
 
-    // (optional) notify followers — keep your existing logic if you want
+    // (optional) notify followers — keep your existing logic
     try {
       const u = await User.findById(meId).select("followers");
-      const followers = (u?.followers || []).map(String).filter(fid => fid !== String(meId));
+      const followers = (u?.followers || [])
+        .map(String)
+        .filter((fid) => fid !== String(meId));
       if (followers.length) {
         await Notification.insertMany(
-          followers.map(fid => ({
+          followers.map((fid) => ({
             recipient: fid,
             actor: meId,
             type: "new_post",

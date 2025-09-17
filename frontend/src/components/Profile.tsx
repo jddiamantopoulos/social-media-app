@@ -298,47 +298,50 @@ const Profile: React.FC = () => {
 
   const handleAvatarPick = () => fileRef.current?.click();
 
-  // helper
-  const cacheBust = (url: string) =>
-    `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
-
   const handleAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
 
-    // Optional: instant preview while uploading
+    // instant preview while uploading (optional)
     const tempUrl = URL.createObjectURL(f);
     setPhotoUrl(tempUrl);
 
-    const form = new FormData();
-    form.append("avatar", f);
+    try {
+      const form = new FormData();
+      form.append("avatar", f); // <-- must match multer field name on backend
 
-    const { data } = await axios.post("/api/user/avatar", form, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+      const { data } = await axios.post("/api/user/avatar", form, {
+        headers: { Authorization: `Bearer ${token}` }, // DON'T set Content-Type manually
+      });
 
-    const freshUrl = cacheBust(data.photoUrl); // bust browser cache
+      // cache-bust helper so the browser fetches the fresh image
+      const freshUrl = `${data.photoUrl}${
+        String(data.photoUrl).includes("?") ? "&" : "?"
+      }cv=${Date.now()}`;
 
-    // Update header avatar immediately
-    setPhotoUrl(freshUrl);
+      // update header avatar immediately
+      setPhotoUrl(freshUrl);
 
-    // Update local user + localStorage
-    setMe((prev) => {
-      const next = { ...prev, photoUrl: freshUrl };
-      localStorage.setItem("user", JSON.stringify(next));
-      return next;
-    });
+      // update local user + localStorage
+      setMe(prev => {
+        const next = { ...prev, photoUrl: freshUrl };
+        localStorage.setItem("user", JSON.stringify(next));
+        return next;
+      });
 
-    // Update every post’s user avatar on this page
-    setPosts((prev) =>
-      prev.map((p) => ({ ...p, user: { ...p.user, photoUrl: freshUrl } }))
-    );
-
-    // Allow reselecting the same file later
-    if (fileRef.current) fileRef.current.value = "";
-
-    // Clean up the temp object URL
-    URL.revokeObjectURL(tempUrl);
+      // update any posts currently in view that show my avatar
+      setPosts(prev => prev.map(p => ({
+        ...p,
+        user: p.user._id === me.id ? { ...p.user, photoUrl: freshUrl } : p.user
+      })));
+    } catch (err) {
+      console.error("Avatar update error:", err);
+      alert("Failed to update avatar. Please try again.");
+    } finally {
+      // allow re-selecting same file later
+      if (fileRef.current) fileRef.current.value = "";
+      URL.revokeObjectURL(tempUrl);
+    }
   };
 
   const saveDescription = async () => {

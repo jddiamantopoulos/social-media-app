@@ -294,7 +294,7 @@ const PostPage: React.FC = () => {
               >
                 {previewUrl ? (
                   <img
-                    src={imgSrc(previewUrl)}
+                    src={previewUrl}
                     alt="Preview"
                     className="image-preview"
                   />
