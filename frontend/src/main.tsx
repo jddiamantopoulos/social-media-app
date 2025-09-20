@@ -6,26 +6,36 @@ import { applyTheme, loadTheme } from "./utils/theme";
 import "bootstrap/dist/css/bootstrap.css";
 import axios from "axios";
 
-// ---- Dataset selection -------------------------------------------------------
+// ---- Dataset selection (sticky + host-aware) --------------------------------
 type DbKey = "friends" | "resume" | "default";
 const VALID_KEYS: DbKey[] = ["friends", "resume", "default"];
 const DEFAULT_DB: DbKey = "default";
 
-// Optional: allow ?db=friends|resume|default to override once
-function pickDbFromUrl(): DbKey | null {
+// Prefer host → one-time ?db= override → stored → default
+function pickDbFromHost(): DbKey | null {
+  const h = window.location.hostname.toLowerCase();
+  if (h.startsWith("friends.")) return "friends";
+  if (h.startsWith("resume."))  return "resume";
+  return null;
+}
+
+function pickDbFromUrlOnce(): DbKey | null {
   const url = new URL(window.location.href);
   const raw = (url.searchParams.get("db") || "").toLowerCase() as DbKey;
-  if (!raw || !VALID_KEYS.includes(raw)) return null;
+  if (!VALID_KEYS.includes(raw)) return null;
 
-  // Clean up the URL (no page reload)
+  // persist and clean the URL (no reload)
+  localStorage.setItem("dbKey", raw);
   url.searchParams.delete("db");
   window.history.replaceState({}, "", url.toString());
   return raw;
 }
 
-const fromUrl = pickDbFromUrl();
-const stored = (localStorage.getItem("dbKey") as DbKey) || null;
-const dbKey: DbKey = fromUrl ?? stored ?? DEFAULT_DB;
+const fromUrl  = pickDbFromUrlOnce();
+const fromHost = pickDbFromHost();
+const stored   = (localStorage.getItem("dbKey") as DbKey) || null;
+
+const dbKey: DbKey = fromUrl ?? stored ?? fromHost ?? DEFAULT_DB;
 
 // Set a default header that the backend reads in pickTenant()
 axios.defaults.headers.common["X-Tenant"] = dbKey;
