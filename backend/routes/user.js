@@ -4,6 +4,8 @@ const router = express.Router();
 const verifyToken = require("../middleware/verifyToken");
 const path = require("path");
 const fs = require("fs");
+const multer = require("multer");
+const { cloudinary } = require("../lib/cloudinary");
 
 // --- helpers: only delete if it was a local file previously ---
 function removeFileIfLocal(url) {
@@ -17,11 +19,23 @@ function isHttpUrl(s = "") {
   return /^https?:\/\//i.test(String(s).trim());
 }
 
+// Multer temp storage (uses req.user.id in filename)
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, path.join(process.cwd(), "tmp")),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || "");
+      cb(null, `${req.user?.id || Date.now()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
 /** POST /api/user/avatar
  *  Body: { photoUrl: "https://res.cloudinary.com/<cloud>/image/upload/...jpg" }
  *  Replaces previous local avatar (if any) and saves the new absolute URL.
  */
-router.post("/user/avatar", verifyToken, async (req, res) => {
+router.post("/user/avatar", verifyToken, upload.single("avatar"), async (req, res) => {
   try {
     const { User } = req.models;
     const me = await User.findById(req.user.id).select("photoUrl");
