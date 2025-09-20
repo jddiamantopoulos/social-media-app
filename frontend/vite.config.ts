@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     viteCommonjs()
   ], 
+  base: "/",
   server: {
     port: 5173,
     strictPort: true,
@@ -19,6 +20,13 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
+    },
+  },
+  preview: {
+    port: 5174,
+    proxy: {
+      "/api": { target: "http://localhost:5000", changeOrigin: true },
+      "/uploads": { target: "http://localhost:5000", changeOrigin: true },
     },
   },
 })

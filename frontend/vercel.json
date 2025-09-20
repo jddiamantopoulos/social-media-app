@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://<your-render-service>.onrender.com/api/$1" },
+    { "source": "/uploads/(.*)", "destination": "https://<your-render-service>.onrender.com/uploads/$1" },
+    { "source": "/(.*)", "destination": "/" }
+  ]
+}
