@@ -1,7 +1,7 @@
 // models/byConn.js
 const path = require("path");
 
-// Import schemas *explicitly* from files in this folder
+// Import schemas explicitly from files in this folder
 const { UserSchema }         = require(path.join(__dirname, "User.js"));
 const { PostSchema }         = require(path.join(__dirname, "Post.js"));
 const { MessageSchema }      = require(path.join(__dirname, "Message.js"));

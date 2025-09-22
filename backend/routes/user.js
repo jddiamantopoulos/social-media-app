@@ -46,7 +46,7 @@ router.post("/user/avatar", verifyToken, upload.single("avatar"), async (req, re
     // 1) Upload to Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: `${process.env.CLOUDINARY_FOLDER || "social-media-app"}/avatars`,
-      public_id: req.user.id,  // stable name per user (optional)
+      public_id: req.user.id,  // stable name per user
       overwrite: true,
     });
 

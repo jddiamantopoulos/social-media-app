@@ -5,7 +5,7 @@ const router = express.Router();
 // simple escape for building a safe regex
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// ----- tiny scorers (same logic you had) -----
+// ----- tiny scorers -----
 function scoreUser(u, q) {
   const s = q.toLowerCase();
   const name = (u.username || "").toLowerCase();

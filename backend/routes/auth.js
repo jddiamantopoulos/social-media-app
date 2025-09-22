@@ -75,7 +75,6 @@ router.post("/signup", async (req, res) => {
     const token = jwt.sign(
       { id: newUser._id, username: newUser.username },
       process.env.JWT_SECRET
-      // , { expiresIn: "30d" } // optional: add if you want expiring tokens
     );
 
     return res.status(201).json({
@@ -112,7 +111,6 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username },
       process.env.JWT_SECRET
-      // , { expiresIn: "30d" } // optional
     );
 
     res.status(200).json({

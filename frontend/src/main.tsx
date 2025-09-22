@@ -11,7 +11,7 @@ type DbKey = "friends" | "resume" | "default";
 const VALID_KEYS: DbKey[] = ["friends", "resume", "default"];
 const DEFAULT_DB: DbKey = "default";
 
-// Prefer host → one-time ?db= override → stored → default
+// Prefer host → one-time ?db= override -> stored -> default
 function pickDbFromHost(): DbKey | null {
   const h = window.location.hostname.toLowerCase();
   if (h.startsWith("friends.")) return "friends";

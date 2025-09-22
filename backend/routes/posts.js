@@ -54,9 +54,6 @@ router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
       // Upload temp file to Cloudinary
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: `${process.env.CLOUDINARY_FOLDER || "social-media-app"}/posts`,
-        // optional:
-        // public_id: `post_${Date.now()}`,
-        // overwrite: true,
       });
       imageUrl = result.secure_url;
 
@@ -66,7 +63,7 @@ router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
 
     const post = await Post.create({ user: meId, description, imageUrl });
 
-    // (optional) notify followers — keep your existing logic
+    // notify followers
     try {
       const u = await User.findById(meId).select("followers");
       const followers = (u?.followers || [])
@@ -100,7 +97,7 @@ router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
   }
 });
 
-// GET all posts (cursor-based; newest → oldest)
+// GET all posts (cursor-based; newest -> oldest)
 router.get("/posts", async (req, res) => {
   try {
     const { Post } = getM(req);
@@ -175,11 +172,10 @@ router.put("/posts/:id", verifyToken, upload.single("image"), async (req, res) =
     if (typeof description === "string") post.description = description;
 
     if (req.file) {
-      // remove old local-only file if you had one
+      // remove old local-only file
       removeLocalIfUploadsPath(post.imageUrl);
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: `${process.env.CLOUDINARY_FOLDER || "social-media"}/posts`,
-        // optional: public_id: `post_${post._id}`, overwrite: true
       });
       post.imageUrl = result.secure_url;
       try { fs.unlink(req.file.path, () => {}); } catch {}

@@ -15,7 +15,7 @@ function buildParticipantsKey(a, b) {
   return `${x}_${y}`;
 }
 
-/** Create-or-get conversation (no lastMessageAt here). */
+/** Create-or-get conversation. */
 router.post("/messages/start", verifyToken, async (req, res) => {
   try {
     const { Conversation } = getM(req);

@@ -48,7 +48,7 @@ function removeFileIfExists(url) {
 /** GET /api/settings/me -> current user's basic settings */
 router.get("/settings/me", verifyToken, async (req, res) => {
   try {
-    const { User } = req.models; // 👈 per-request models
+    const { User } = req.models; // per-request models
     const u = await User.findById(req.user.id).select("username photoUrl");
     if (!u) return res.status(404).json({ message: "User not found" });
     res.json({ username: u.username, photoUrl: u.photoUrl });
