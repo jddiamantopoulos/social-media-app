@@ -56,10 +56,11 @@ const About: React.FC = () => {
             CyberScape is a lightweight social media platform built with React,
             MongoDB, and multiple web development modules and libraries using
             ChatGPT. It involves backend programming via JavaScript files and
-            frontend programming via TypeScript + JavaScript XML (TSX) fiiles.
-            It showcases multiple features of a standard social media app,
-            including accounts, posting, followers, likes/dislikes, search,
-            comments, replies, settings, messages, notifications, editing,
+            frontend programming via TypeScript + JavaScript XML (TSX) files.
+            To deploy the project, I used Render for the backend and Vercel for the
+            frontend. Additionally, the web app showcases multiple features of a standard
+            social media app, including accounts, posting, followers, likes/dislikes,
+            search, comments, replies, settings, messages, notifications, editing,
             deleting, and real-time-ish sync via polling.
           </p>
           <p className="lead">
