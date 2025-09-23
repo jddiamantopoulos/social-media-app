@@ -12,7 +12,7 @@ const truncateMiddle = (str: string, max = 28) => {
   return str.slice(0, half) + "…" + str.slice(-half);
 };
 
-const stripNewlines = (s: string) => (s ?? "").replace(/[\r\n]+/g, " ").trim();
+const stripNewlines = (s: string) => (s ?? "").replace(/\r\n?/g, "\n").replace(/\t/g, "  ");
 
 const EditPostPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

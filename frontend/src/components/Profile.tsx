@@ -50,7 +50,7 @@ interface Me {
 }
 
 const MAX_DESC_LEN = 150;
-const stripNewlines = (s: string) => (s ?? "").replace(/[\r\n]+/g, " ").trim();
+const stripNewlines = (s: string) => (s ?? "").replace(/\r\n?/g, "\n").replace(/\t/g, "  ");
 
 const Profile: React.FC = () => {
   const token = localStorage.getItem("token")!;

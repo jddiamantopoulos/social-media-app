@@ -12,7 +12,7 @@ function truncateMiddle(name: string, max = 22) {
   return name.slice(0, head) + "…" + name.slice(-tail);
 }
 
-const stripNewlines = (s: string) => (s ?? "").replace(/[\r\n]+/g, " ").trim();
+const stripNewlines = (s: string) => (s ?? "").replace(/\r\n?/g, "\n").replace(/\t/g, "  ");
 
 const PostPage: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
