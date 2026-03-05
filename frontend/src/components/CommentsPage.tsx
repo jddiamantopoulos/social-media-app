@@ -1,4 +1,37 @@
-// src/components/CommentsPage.tsx
+/**
+ * Comments overlay/page for a single post.
+ *
+ * Purpose:
+ *   - Displays a post's comments + nested replies and allows authenticated users to add, edit,
+ *     delete, and react (like/dislike) to comments and replies.
+ *
+ * Key behaviors:
+ *   - Fetches the post to load comments/replies and post owner id
+ *   - Preserves UI state per post + per navigation visit (expanded threads, drafts, frozen order, scroll)
+ *   - Uses optimistic updates for reactions and for newly created comments (temp id), then syncs with server
+ *   - Polls periodically for near real-time updates and pauses polling briefly during edits/submission
+ *   - Supports reply @mentions with a locked, non-editable mention prefix
+ *
+ * Backend endpoints:
+ *   - GET    /api/posts/:postId
+ *   - POST   /api/posts/:postId/comments
+ *   - DELETE /api/posts/:postId/comments/:commentId
+ *   - PUT    /api/posts/:postId/comments/:commentId
+ *   - POST   /api/posts/:postId/comments/:commentId/like|dislike
+ *   - POST   /api/posts/:postId/comments/:commentId/replies
+ *   - DELETE /api/posts/:postId/comments/:commentId/replies/:replyId
+ *   - PUT    /api/posts/:postId/comments/:commentId/replies/:replyId
+ *   - POST   /api/posts/:postId/comments/:commentId/replies/:replyId/like|dislike
+ *
+ * State & storage:
+ *   - Reads auth token + user snapshot from localStorage
+ *   - Persists per-visit UI state using usePageState (items, composer mode, draft text, frozen ordering)
+ *   - Persists expanded reply threads + scroll position in sessionStorage (keyed by post + visit)
+ *
+ * Notes:
+ *   - "Frozen order" keeps the comment order stable during a single overlay session to avoid jitter.
+ *   - Locks background scrolling while the overlay is open for a modal-like experience.
+ */
 import React, {
   useEffect,
   useLayoutEffect,
@@ -74,7 +107,7 @@ const CommentsPage: React.FC = () => {
   // Namespaced keys for this post + visit
   const keyOf = (name: string) => `co:${postId}:${name}:v=${visitId}`;
 
-  // --- cache-version (cv) that resets on refresh ---
+  // Cache-version (cv) that resets on refresh
   const search0 = new URLSearchParams(location.search);
   let cv = search0.get("cv") || "";
 
@@ -83,7 +116,7 @@ const CommentsPage: React.FC = () => {
     cv = String(Date.now());
     const url = new URL(window.location.href);
     url.searchParams.set("cv", cv);
-    // keep existing history.state so back/forward works the same
+    // Keep existing history.state so back/forward works the same
     window.history.replaceState(
       { ...(window.history.state || {}) },
       "",
@@ -93,7 +126,7 @@ const CommentsPage: React.FC = () => {
 
   const tag = cv ? `:${cv}` : "";
 
-  // Use these keys everywhere you persist to session/page state:
+  // Keys used to persist to session/page state:
   const EXP_KEY = keyOf("expanded");
   const Y_KEY = keyOf("y");
 
@@ -263,7 +296,7 @@ const CommentsPage: React.FC = () => {
     else navigate("/home");
   };
 
-  // responsive layout helpers + icon styles
+  // Responsive layout helpers + icon styles
   const styles = `
   .co-headrow, .co-r-headrow {
     display: flex;
@@ -296,8 +329,10 @@ const CommentsPage: React.FC = () => {
     }
   }
 
-  .co-overlay { top: 70px; }           /* default = mobile/tablet */
-  @media (min-width: 992px) {           /* desktop (Bootstrap lg) */
+  /* Default = mobile/tablet */
+  .co-overlay { top: 70px; }
+  /* Desktop (Bootstrap lg) */
+  @media (min-width: 992px) {
     .co-overlay { top: 66px; }
   }
 
@@ -318,7 +353,6 @@ const CommentsPage: React.FC = () => {
     background: var(--scrollbar-track);
     border-radius: 8px;
   }
-  /* in your styles string */
   .co-scroll { scroll-behavior: auto; }
 
   /* Icon-only action buttons (reply/edit/delete) */
@@ -358,13 +392,16 @@ const CommentsPage: React.FC = () => {
   .reply-toggle {
     background: none;
     border: 0;
-    padding: 0;            /* no boxy chrome */
+    /* No boxy chrome */
+    padding: 0;
     margin: 0;
-    color: #6c757d;        /* muted like other icons */
+    /* Muted like other icons */
+    color: #6c757d;
     cursor: pointer;
     border-radius: .375rem;
   }
-  .reply-toggle:hover { color: #0d6efd; }  /* subtle hover */
+  /* Subtle hover */
+  .reply-toggle:hover { color: #0d6efd; }
   .reply-toggle:focus { outline: 2px solid #0d6efd33; outline-offset: 2px; }
 
   .react-btn:focus { outline: 2px solid #0d6efd33; outline-offset: 2px; }
@@ -386,7 +423,7 @@ const CommentsPage: React.FC = () => {
     wordBreak: "break-word",
   };
 
-  // ----- server helpers -----
+  // ----- Server helpers -----
   const mapServerComments = (list: any[]): Comment[] =>
     (list || []).map((c: any) => ({
       _id: c._id,
@@ -419,7 +456,7 @@ const CommentsPage: React.FC = () => {
 
   // Build an order once: my comments first, each group newest -> oldest
   const buildFrozenOrder = (arr: Comment[]) => {
-    // simple engagement-first rule for non-my comments
+    // Simple engagement-first rule for non-my comments
     const net = (c: Comment) =>
       (c.likes?.length ?? 0) - (c.dislikes?.length ?? 0);
 
@@ -428,25 +465,27 @@ const CommentsPage: React.FC = () => {
         const aMine = a.user._id === myId;
         const bMine = b.user._id === myId;
 
-        // 1) My comments always above others (keep your existing behavior)
+        // My comments always above others
         if (aMine && !bMine) return -1;
         if (!aMine && bMine) return 1;
 
-        // 2) Within the same group (mine vs others),
-        //    rank by engagement instead of pure recency
+        // Within the same group (mine vs others), rank by engagement instead of pure recency
         const aNet = net(a);
         const bNet = net(b);
-        if (bNet !== aNet) return bNet - aNet; // higher net likes first
+        // Higher net likes first
+        if (bNet !== aNet) return bNet - aNet;
 
         const aLikes = a.likes?.length ?? 0;
         const bLikes = b.likes?.length ?? 0;
-        if (bLikes !== aLikes) return bLikes - aLikes; // more raw likes next
+        // More raw likes next
+        if (bLikes !== aLikes) return bLikes - aLikes;
 
         const aReplies = a.replies?.length ?? 0;
         const bReplies = b.replies?.length ?? 0;
-        if (bReplies !== aReplies) return bReplies - aReplies; // more replies next
+        // More replies next
+        if (bReplies !== aReplies) return bReplies - aReplies;
 
-        // final tie-breaker: newer first
+        // Final tie-breaker: newer first
         return (
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
@@ -454,7 +493,7 @@ const CommentsPage: React.FC = () => {
       .map((c) => c._id);
   };
 
-  // initial fetch (fallback to props on error)
+  // Initial fetch (fallback to props on error)
   useEffect(() => {
     setFrozenOrder(null);
 
@@ -489,7 +528,7 @@ const CommentsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
 
-  // polling (pause while editing)
+  // Polling (pause while editing)
   const editingSomething =
     composer?.mode === "edit-comment" || composer?.mode === "edit-reply";
   useEffect(() => {
@@ -501,12 +540,12 @@ const CommentsPage: React.FC = () => {
     return () => window.clearInterval(id);
   }, [postId, editingSomething]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // focus composer when it opens / mode changes
+  // Focus composer when it opens / mode changes
   useEffect(() => {
     if (composer) inputRef.current?.focus();
   }, [composer?.mode]);
 
-  // lock background scroll
+  // Lock background scroll
   useEffect(() => {
     const prevOverflow = document.body.style.overflow;
     const prevPaddingRight = document.body.style.paddingRight;
@@ -522,13 +561,13 @@ const CommentsPage: React.FC = () => {
     };
   }, []);
 
-  // ----- reactions (comments) -----
+  // ----- Reactions (comments) -----
   const reactComment = async (commentId: string, type: "like" | "dislike") => {
     if (!token || !myId) {
       navigate("/login");
       return;
     }
-    // optimistic flip
+    // Optimistic flip
     setItems((prev) =>
       prev.map((c) => {
         if (c._id !== commentId) return c;
@@ -577,7 +616,7 @@ const CommentsPage: React.FC = () => {
     }
   };
 
-  // ----- reactions (replies) -----
+  // ----- Reactions (replies) -----
   const reactReply = async (
     commentId: string,
     replyId: string,
@@ -625,14 +664,14 @@ const CommentsPage: React.FC = () => {
     }
   };
 
-  // ----- open composer helpers -----
+  // ----- Open composer helpers -----
   const openCommentComposer = () => {
     if (!token) {
       navigate("/login");
       return;
     }
     setComposer({ mode: "comment" });
-    setTextBody((prev) => prev); // keep draft if you want; no-op
+    setTextBody((prev) => prev);
   };
 
   const startReply = (
@@ -702,17 +741,19 @@ const CommentsPage: React.FC = () => {
     }
   };
 
-  // ----- submit / cancel -----
+  // ----- Submit / cancel -----
   const handleSubmit = async () => {
     if (!isLoggedIn || !composer) return;
 
     const typed = (textBody ?? "").trim();
-    if (typed.length === 0) return; // aligns with disabled button
-    const safeTyped = typed.slice(0, MAX_CHARS); // hard cap
+    // Aligns with disabled button
+    if (typed.length === 0) return;
+    // Hard cap
+    const safeTyped = typed.slice(0, MAX_CHARS);
 
     try {
       if (composer.mode === "comment") {
-        // 1) optimistic temp comment so it appears instantly at the top
+        // Optimistic temp comment so it appears instantly at the top
         const tempId = `tmp-${Date.now()}`;
         const temp: Comment = {
           _id: tempId,
@@ -733,14 +774,15 @@ const CommentsPage: React.FC = () => {
         setItems((prev) => [temp, ...prev]);
         setFrozenOrder((prev) => [tempId, ...(prev ?? [])]);
 
-        skipPollingUntilRef.current = Date.now() + 3000; // pause polling for 3s
+        // Pause polling for 3s
+        skipPollingUntilRef.current = Date.now() + 3000;
 
-        // 2) scroll to the very top so the user sees it
+        // Scroll to the very top so the user sees it
         setTimeout(() => {
           listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
         }, 0);
 
-        // 3) fire the real post (parent handles it). NO refetch here → no flicker
+        // Fire the real post (parent handles it); no refetch, no flicker
         await axios.post(
           `/api/posts/${postId}/comments`,
           { text: safeTyped },
@@ -754,7 +796,7 @@ const CommentsPage: React.FC = () => {
       }
 
       if (composer.mode === "reply") {
-        // mention prefix is outside the 2200 limit
+        // Mention prefix is outside the 2200 limit
         const full = `${
           lockedMentionText ? lockedMentionText + " " : ""
         }${safeTyped}`;
@@ -808,7 +850,7 @@ const CommentsPage: React.FC = () => {
     setTextBody("");
   };
 
-  // derived UI bits
+  // Derived UI bits
   const placeholder = useMemo(() => {
     if (!composer) return "";
     if (composer.mode === "reply" || composer.mode === "edit-reply") {
@@ -842,7 +884,7 @@ const CommentsPage: React.FC = () => {
   const clampToMax = (s: string) => (s || "").slice(0, MAX_CHARS);
   const overLimit = typedLen > MAX_CHARS;
 
-  // live length (counts @mention prefix for replies/edit-replies)
+  // Live length (counts @mention prefix for replies/edit-replies)
   const mentionPrefix =
     composer &&
     (composer.mode === "reply" || composer.mode === "edit-reply") &&
@@ -856,14 +898,16 @@ const CommentsPage: React.FC = () => {
 
   const sessionOrdered = useMemo(() => {
     const ids = frozenOrder;
-    if (!ids) return items; // first render while loading
+    // First render while loading
+    if (!ids) return items;
     const idx = new Map(ids.map((id, i) => [id, i]));
     const rank = (c: Comment) =>
       idx.has(c._id)
         ? (idx.get(c._id) as number)
         : c.user._id === myId
         ? -1
-        : Number.MAX_SAFE_INTEGER; // unknown *mine* go to top
+        // Unknown *mine* go to top
+        : Number.MAX_SAFE_INTEGER;
     return [...items].sort((a, b) => rank(a) - rank(b));
   }, [items, frozenOrder]);
 
@@ -887,7 +931,7 @@ const CommentsPage: React.FC = () => {
     >
       <style>{styles}</style>
 
-      {/* header */}
+      {/* Header */}
       <div
         className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
         style={{ flex: "0 0 auto", background: "var(--bs-card-bg)" }}
@@ -903,7 +947,7 @@ const CommentsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* list */}
+      {/* List */}
       <div
         className="co-scroll"
         ref={listRef}
@@ -921,13 +965,13 @@ const CommentsPage: React.FC = () => {
                 key={i}
                 className="d-flex align-items-start mb-3 placeholder-glow"
               >
-                {/* avatar */}
+                {/* Avatar */}
                 <span
                   className="rounded-circle me-2 placeholder"
                   style={{ width: 32, height: 32 }}
                   aria-hidden
                 />
-                {/* name/time + body */}
+                {/* Name/time + body */}
                 <div className="w-100">
                   <div className="mb-2">
                     <span className="placeholder col-3 me-2" />
@@ -1048,7 +1092,7 @@ const CommentsPage: React.FC = () => {
                           <span className="count">{c.dislikes.length}</span>
                         </button>
 
-                        {/* icon-only actions */}
+                        {/* Icon-only actions */}
                         <button
                           type="button"
                           className="icon-btn"
@@ -1101,7 +1145,7 @@ const CommentsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* replies toggle */}
+                    {/* Replies toggle */}
                     {repliesCount > 0 && (
                       <div className="mt-2">
                         <button
@@ -1175,7 +1219,7 @@ const CommentsPage: React.FC = () => {
 
                                 <div style={contentStyle}>
                                   <div className="co-r-headrow">
-                                    {/* left: name/time + text */}
+                                    {/* Left: name/time + text */}
                                     <div className="co-r-left">
                                       <div
                                         className="d-flex align-items-center flex-wrap"
@@ -1225,7 +1269,7 @@ const CommentsPage: React.FC = () => {
                                       </div>
                                     </div>
 
-                                    {/* right: reply actions */}
+                                    {/* Right: reply actions */}
                                     <div className="co-r-actions">
                                       <button
                                         type="button"
@@ -1265,7 +1309,7 @@ const CommentsPage: React.FC = () => {
                                         </span>
                                       </button>
 
-                                      {/* icon-only reply/edit/delete */}
+                                      {/* Icon-only reply/edit/delete */}
                                       <button
                                         type="button"
                                         className="icon-btn"
@@ -1343,14 +1387,14 @@ const CommentsPage: React.FC = () => {
         </button>
       )}
 
-      {/* Bottom composer – shown only when composer is open */}
+      {/* Bottom composer - shown only when composer is open */}
       {isLoggedIn && composer && (
         <div
           className="px-3 py-2 border-top"
           style={{ flex: "0 0 auto", background: "var(--bs-card-bg)" }}
         >
           <div className="d-flex align-items-center" style={{ gap: ".5rem" }}>
-            {/* ⬇️ Wrap the input(s) so we can place the helper text under it */}
+            {/* Wrap the input(s) to place the helper text under it */}
             <div className="flex-grow-1">
               {(composer.mode === "reply" || composer.mode === "edit-reply") &&
               lockedMentionText ? (
@@ -1366,7 +1410,8 @@ const CommentsPage: React.FC = () => {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        if (!isTypedEmpty) handleSubmit(); // ignore Enter on empty
+                        // Ignore Enter on empty
+                        if (!isTypedEmpty) handleSubmit();
                       }
                     }}
                     style={{ minWidth: 0 }}
@@ -1409,9 +1454,10 @@ const CommentsPage: React.FC = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleSubmit}
-                  disabled={isTypedEmpty} // disabled at zero typed chars
+                  // Disabled at zero typed chars
+                  disabled={isTypedEmpty}
                 >
-                  Post{/* or Reply / Save */}
+                  Post
                 </button>
                 <button
                   type="button"
@@ -1429,9 +1475,10 @@ const CommentsPage: React.FC = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleSubmit}
-                  disabled={isTypedEmpty} // disabled at zero typed chars
+                  // Disabled at zero typed chars
+                  disabled={isTypedEmpty}
                 >
-                  Reply{/* or Reply / Save */}
+                  Reply
                 </button>
 
                 <button
@@ -1451,9 +1498,10 @@ const CommentsPage: React.FC = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleSubmit}
-                  disabled={isTypedEmpty} // disabled at zero typed chars
+                  // Disabled at zero typed chars
+                  disabled={isTypedEmpty}
                 >
-                  Save{/* or Reply / Save */}
+                  Save
                 </button>
 
                 <button

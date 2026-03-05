@@ -1,8 +1,16 @@
-// middleware/verifyToken.js
+/**
+ * Express middleware for authenticating requests using JSON Web Tokens (JWT).
+ *
+ * Expects an Authorization header in the format:
+ *   "Bearer <token>"
+ *
+ * Verifies the token using the server's JWT secret and, if valid,
+ * attaches a normalized user object to req.user for downstream routes.
+ */
 const jwt = require("jsonwebtoken");
 
 function verifyToken(req, res, next) {
-  const auth = req.headers["authorization"] || ""; // "Bearer <token>"
+  const auth = req.headers["authorization"] || "";
   const [scheme, token] = auth.split(" ");
 
   if (!token || !/^Bearer$/i.test(scheme)) {
@@ -10,7 +18,7 @@ function verifyToken(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET); // throws if bad/expired
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
     // Normalize the shape expected by routes
     req.user = {
       id: String(payload.id || ""),

@@ -1,4 +1,38 @@
-// src/components/PostDetail.tsx
+/**
+ * Post detail page component.
+ *
+ * Purpose:
+ *   - Displays a single post with author info, timestamp, description, and optional image.
+ *   - Enables users to view engagement and interact with the post.
+ *
+ * Key behaviors:
+ *   - Fetches post data on mount and when the route ID changes
+ *   - Allows authenticated users to like or dislike a post
+ *   - Allows authenticated users to submit comments
+ *   - Shows edit and delete controls for the post owner
+ *   - Redirects to login when unauthenticated users attempt protected actions
+ *   - Displays loading skeletons and "not found" UI when appropriate
+ *
+ * Backend endpoints:
+ *   - GET    /api/posts/:id
+ *   - POST   /api/posts/:id/like
+ *   - POST   /api/posts/:id/dislike
+ *   - POST   /api/posts/:id/comments
+ *   - DELETE /api/posts/:id
+ *
+ * State & storage:
+ *   - Reads authentication data from localStorage:
+ *       - token (JWT string)
+ *       - user  (JSON-serialized user object)
+ *   - Maintains local state for:
+ *       - post data
+ *       - loading status
+ *
+ * Notes:
+ *   - Normalizes relative image URLs using VITE_API_URL while preserving absolute URLs.
+ *   - Uses inline skeleton components to improve perceived loading performance.
+ *   - Styling is embedded via scoped CSS-in-JS blocks for component isolation.
+ */
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -67,7 +101,7 @@ const SinglePostLoading: React.FC = () => {
   .single-post-loading .sp-pill{ height:16px; width:56px; border-radius:999px; }
   .single-post-loading .sp-pill.wide{ width:72px; }
 
-  /* width helpers */
+  /* Width helpers */
   .single-post-loading .w-35{ width:35%; }
   .single-post-loading .w-22{ width:22%; }
   .single-post-loading .w-96{ width:96%; }
@@ -85,7 +119,7 @@ const SinglePostLoading: React.FC = () => {
       <style>{styles}</style>
 
       <div className="card mb-4 shadow-sm">
-        {/* header skeleton */}
+        {/* Header skeleton */}
         <div className="card-body d-flex align-items-start">
           <div className="sp-skel sp-avatar me-2" />
           <div className="flex-grow-1">
@@ -94,17 +128,17 @@ const SinglePostLoading: React.FC = () => {
           </div>
         </div>
 
-        {/* text skeleton */}
+        {/* Text skeleton */}
         <div className="card-body">
           <div className="sp-skel sp-line w-96 mb-2" />
           <div className="sp-skel sp-line w-82 mb-2" />
           <div className="sp-skel sp-line w-66" />
         </div>
 
-        {/* image skeleton (if final post has no image, this still looks fine) */}
+        {/* Image skeleton */}
         <div className="sp-skel sp-image" />
 
-        {/* footer actions skeleton */}
+        {/* Footer actions skeleton */}
         <div className="card-footer d-flex" style={{ gap: 12 }}>
           <div className="sp-skel sp-pill" />
           <div className="sp-skel sp-pill" />
@@ -135,12 +169,15 @@ const PostDetail: React.FC = () => {
     padding: 4px;
     margin: 0;
     line-height: 1;
-    color: #6c757d;          /* muted */
+    /* Muted */
+    color: #6c757d;
     cursor: pointer;
     border-radius: .375rem;
   }
-  .icon-btn:hover { color: #0d6efd; }           /* primary on hover */
-  .icon-btn.danger:hover { color: #dc3545; }    /* red on hover */
+  /* Primary on hover */
+  .icon-btn:hover { color: #0d6efd; }
+  /* Red on hover */
+  .icon-btn.danger:hover { color: #dc3545; }
 
   .icon-btn:focus {
     outline: 2px solid #0d6efd33;
@@ -158,8 +195,10 @@ const PostDetail: React.FC = () => {
     align-items: center;
     gap: 6px;
   }
-  .reaction.like.active { color: #0d6efd; }     /* liked = primary */
-  .reaction.dislike.active { color: #dc3545; }  /* disliked = red  */
+  /* Liked = primary */
+  .reaction.like.active { color: #0d6efd; }
+  /* Disliked = red  */
+  .reaction.dislike.active { color: #dc3545; }
 
   .reaction.like:hover { color: #0d6efd; }
   .reaction.dislike:hover { color: #dc3545; }
@@ -196,7 +235,8 @@ const PostDetail: React.FC = () => {
       setPost(data);
     } catch (e: any) {
       if (axios.isAxiosError(e) && e.response?.status === 404) {
-        setPost(null); // if it no longer exists
+        // If it no longer exists
+        setPost(null);
       }
       console.error(e);
     } finally {
@@ -238,8 +278,10 @@ const PostDetail: React.FC = () => {
       await axios.delete(`/api/posts/${postId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setOverlayPostId(null); // close comments, if open
-      setPost(null); // triggers "Post not found" render
+      // Close comments, if open
+      setOverlayPostId(null);
+      // Triggers "Post not found" render
+      setPost(null);
     } catch (err) {
       console.error("Delete error:", err);
       alert("Failed to delete post.");
@@ -258,8 +300,7 @@ const PostDetail: React.FC = () => {
   const disliked = me.id ? post.dislikes.includes(me.id) : false;
   const profileLink = isMe ? "/profile" : `/users/${post.user._id}`;
   
-  // turn "/uploads/x.jpg" into "https://your-backend.onrender.com/uploads/x.jpg"
-  // leave Cloudinary (https://...) URLs unchanged
+  // Convert local uploads photo link to render link
   const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
   const imgSrc = (u?: string) =>
     !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
@@ -269,7 +310,7 @@ const PostDetail: React.FC = () => {
       <style>{styles}</style>
 
       <div className="card mb-4">
-        {/* HEADER (one row) */}
+        {/* Header (one row) */}
         <div className="card-body d-flex justify-content-between align-items-start">
           <Link
             to={profileLink}

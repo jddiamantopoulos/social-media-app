@@ -1,4 +1,13 @@
-// src/lib/api.ts
+/**
+ * Centralized Axios client configuration.
+ *
+ * Creates a shared API instance with a predefined base URL and
+ * request interceptor that injects a tenant identifier based on
+ * the current subdomain.
+ *
+ * Automatically adds the X-Tenant header to all outgoing requests
+ * to support multi-tenant backend routing.
+ */
 import axios, { AxiosHeaders } from "axios";
 
 export const api = axios.create({
@@ -9,8 +18,7 @@ export const api = axios.create({
 function subdomainToTenant(host: string) {
   const h = (host || "").toLowerCase();
   if (h.startsWith("friends.")) return "friends";
-  if (h.startsWith("resume."))  return "resume";
-  return "default";
+  return "resume";
 }
 
 api.interceptors.request.use((config) => {

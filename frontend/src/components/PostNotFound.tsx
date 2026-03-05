@@ -1,4 +1,27 @@
-// src/components/PostNotFound.tsx
+/**
+ * Post not found page component.
+ *
+ * Purpose:
+ *   - Displays a user-friendly fallback UI when a requested post does not exist
+ *     or is no longer available.
+ *
+ * Key behaviors:
+ *   - Renders a styled informational card with contextual messaging
+ *   - Provides a navigation control to return to the previous page
+ *   - Uses theme-aware styling consistent with the application's design system
+ *
+ * Backend endpoints:
+ *   - None (pure presentation component)
+ *
+ * State & storage:
+ *   - Does not maintain internal state
+ *   - Does not interact with localStorage or backend APIs
+ *
+ * Notes:
+ *   - Designed to be rendered when GET /api/posts/:id returns 404
+ *   - Styled using Bootstrap theme variables for dark/light mode compatibility
+ *   - Keeps messaging neutral (post may be deleted or invalid link)
+ */
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -45,7 +68,7 @@ const PostNotFound: React.FC = () => {
           <div className="flex-grow-1">
             <h4 className="pnf-title mb-1">Post not found</h4>
             <p className="pnf-sub mb-3">
-              We couldn’t find that post. It was likely deleted or the link
+              We couldn't find that post. It was likely deleted or the link
               leads to no existing post in the database.
             </p>
 

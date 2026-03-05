@@ -1,4 +1,13 @@
-// models/Post.js
+/**
+ * Post schema for the main social feed.
+ *
+ * Supports nested comments and one-level replies, along with
+ * likes/dislikes and edit tracking. Uses embedded subdocuments
+ * to optimize read performance for feed and discussion views.
+ *
+ * Includes indexes for feed ordering, per-user posts, and
+ * efficient updates to nested comments and replies.
+ */
 const { Schema } = require("mongoose");
 
 const ReplySchema = new Schema(
@@ -10,7 +19,7 @@ const ReplySchema = new Schema(
     dislikes:[{ type: Schema.Types.ObjectId, ref: "User", default: [] }],
     editedAt:{ type: Date, default: null },
   },
-  { timestamps: true } // adds createdAt/updatedAt to replies
+  { timestamps: true }
 );
 
 const CommentSchema = new Schema(
@@ -19,10 +28,10 @@ const CommentSchema = new Schema(
     text:     { type: String, required: true, trim: true, maxlength: 2200 },
     likes:    [{ type: Schema.Types.ObjectId, ref: "User", default: [] }],
     dislikes: [{ type: Schema.Types.ObjectId, ref: "User", default: [] }],
-    replies:  [ReplySchema], // one-level replies
+    replies:  [ReplySchema],
     editedAt: { type: Date, default: null },
   },
-  { timestamps: true } // adds createdAt/updatedAt to comments
+  { timestamps: true }
 );
 
 const PostSchema = new Schema(
@@ -35,7 +44,7 @@ const PostSchema = new Schema(
     comments:    [CommentSchema],
     editedAt:    { type: Date, default: null },
   },
-  { timestamps: true } // adds createdAt/updatedAt to posts
+  { timestamps: true }
 );
 
 // Feed & per-user queries

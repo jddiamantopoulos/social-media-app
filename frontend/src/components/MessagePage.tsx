@@ -1,4 +1,31 @@
-// src/components/MessagePage.tsx
+/**
+ * Messaging page component (Inbox + Conversation).
+ *
+ * Purpose:
+ *   - Provides a direct-messaging UI with an inbox view and a single conversation thread view.
+ *
+ * Key behaviors:
+ *   - /messages shows the inbox (conversations list) with unread counts and username search
+ *   - /messages/:conversationId shows the thread with auto-scroll management and a composer
+ *   - Polls inbox and thread for near real-time updates, using merge logic to minimize re-render jitter
+ *   - Marks inbound messages as read and displays a lightweight "Seen" indicator for the latest read sent message
+ *   - Resolves the other participant from inbox data, navigation state, or fallback user fetch
+ *
+ * Backend endpoints:
+ *   - GET  /api/messages/conversations
+ *   - GET  /api/messages/:conversationId
+ *   - POST /api/messages/:conversationId           (send)
+ *   - POST /api/messages/:conversationId/read      (mark read)
+ *   - GET  /api/users/:id                          (fallback: resolve other user)
+ *
+ * State & storage:
+ *   - Reads auth token + user snapshot from localStorage
+ *
+ * Notes:
+ *   - Polling is paused when the tab is hidden (document.hidden) to reduce unnecessary requests.
+ *   - Uses component-scoped CSS injected via a <style> tag to keep theming localized.
+ *   - Normalizes avatar URLs using VITE_API_URL for relative backend paths.
+ */
 import React from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
@@ -68,7 +95,8 @@ function mergeMessages(prev: Msg[], incoming: Msg[]): Msg[] {
       old.createdAt === inc.createdAt &&
       shallowArrayEq(old.readBy, inc.readBy)
     ) {
-      return old; // unchanged ref
+      // Unchanged ref
+      return old;
     }
     changed = true;
     return inc;
@@ -99,15 +127,6 @@ function mergeInbox(prev: InboxRow[], incoming: InboxRow[]): InboxRow[] {
   return changed ? next : prev;
 }
 
-const isNearBottom = (el: HTMLDivElement | null, threshold = 40) => {
-  if (!el) return true;
-  const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
-  return gap <= threshold;
-};
-
-/** =========================================
- *                 Component
- * ======================================= */
 const MessagePage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
@@ -118,7 +137,7 @@ const MessagePage: React.FC = () => {
     [navigate]
   );
 
-  // If your IDs are Mongo ObjectIds, this filters obvious junk before hitting the API
+  // Filters obvious junk before hitting the API if IDs are Mongo ObjectIds
   React.useEffect(() => {
     if (conversationId && !/^[a-f0-9]{24}$/i.test(conversationId)) {
       gotoInbox();
@@ -214,7 +233,7 @@ const MessagePage: React.FC = () => {
       color: var(--bs-list-group-action-hover-color, var(--bs-body-color)) !important;
     }
 
-    /* Optional: active/selected style (if you ever add it) */
+    /* Active/selected style */
     .mp-card .list-group-item.active{
       background-color: var(--bs-primary) !important;
       color: #fff !important;
@@ -255,7 +274,7 @@ const MessagePage: React.FC = () => {
     .username-link:hover { color: var(--bs-link-hover-color) !important; }
   `;
 
-  /** --------------- INBOX state + fetch --------------- */
+  /** --------------- Inbox state + fetch --------------- */
   const [inbox, setInbox] = React.useState<InboxRow[]>([]);
   const [loadingInbox, setLoadingInbox] = React.useState(false);
   const [inboxError, setInboxError] = React.useState<string | null>(null);
@@ -274,7 +293,7 @@ const MessagePage: React.FC = () => {
           { headers: authHeaders }
         );
 
-        // keep only conversations that still have a valid otherUser
+        // Keep only conversations that still have a valid otherUser
         const filtered = (data?.conversations || []).filter(
           (c) => !!c.otherUser && !!c.otherUser._id && !!c.otherUser.username
         );
@@ -291,7 +310,7 @@ const MessagePage: React.FC = () => {
     [authed, authHeaders]
   );
 
-  /** --------------- CONVO state + fetch --------------- */
+  /** --------------- Convo state + fetch --------------- */
   const [messages, setMessages] = React.useState<Msg[]>([]);
   const [loadingConvo, setLoadingConvo] = React.useState(false);
   const [convoLoaded, setConvoLoaded] = React.useState(false);
@@ -302,7 +321,7 @@ const MessagePage: React.FC = () => {
   const [query, setQuery] = React.useState("");
 
   // When there's a query, filter and sort alphabetically by username.
-  // When empty, keep your original inbox order (recent activity).
+  // When empty, keep the original inbox order (recent activity).
   const filteredInbox = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return inbox;
@@ -320,21 +339,21 @@ const MessagePage: React.FC = () => {
     return rows;
   }, [query, inbox]);
 
-  // autoscroll manager (only stick to bottom if user is already near bottom)
+  // Autoscroll manager (only stick to bottom if user is already near bottom)
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const lastMsgIdRef = React.useRef<string | null>(null);
 
-  // Always start at bottom when a convo opens, and keep bottom if you're near it
+  // Always start at bottom when a convo opens, and keep bottom if user is near it
   React.useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    // id of the newest message
+    // Id of the newest message
     const last = messages.length ? messages[messages.length - 1]._id : null;
     const changed = last !== lastMsgIdRef.current;
 
     const scrollToBottom = (behavior: ScrollBehavior) => {
-      // double-rAF to wait for layout/paint (prevents "stuck" feeling)
+      // Double-rAF to wait for layout/paint (prevents getting stuck)
       requestAnimationFrame(() =>
         requestAnimationFrame(() =>
           el.scrollTo({ top: el.scrollHeight, behavior })
@@ -343,10 +362,10 @@ const MessagePage: React.FC = () => {
     };
 
     if (!lastMsgIdRef.current) {
-      // first paint for this conversation → jump to bottom
+      // First paint for this conversation -> jump to bottom
       scrollToBottom("auto");
     } else if (changed) {
-      // message appended: keep you pinned only if you're already near bottom
+      // Message appended: keep user pinned only if user already near bottom
       const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
       if (gap <= 120) scrollToBottom("smooth");
     }
@@ -355,7 +374,8 @@ const MessagePage: React.FC = () => {
   }, [messages, conversationId]);
 
   React.useEffect(() => {
-    lastMsgIdRef.current = null; // force the first-paint branch above
+    // Force the first-paint branch above
+    lastMsgIdRef.current = null;
   }, [conversationId]);
 
   function ConversationsLoadingSkeleton({ rows = 6 }: { rows?: number }) {
@@ -367,13 +387,13 @@ const MessagePage: React.FC = () => {
               className="d-flex align-items-start placeholder-wave"
               style={{ gap: 12 }}
             >
-              {/* avatar */}
+              {/* Avatar */}
               <div
                 className="placeholder rounded-circle flex-shrink-0"
                 style={{ width: 40, height: 40 }}
                 aria-hidden
               />
-              {/* name + snippet */}
+              {/* Name + snippet */}
               <div className="flex-grow-1">
                 <div className="d-flex justify-content-between align-items-center">
                   <div className="placeholder col-4 mb-2" aria-hidden />
@@ -393,10 +413,11 @@ const MessagePage: React.FC = () => {
   }: {
     messages?: number;
   }) {
-    // alternate left/right “bubbles”
+    // Alternate left/right "bubbles"
     const items = Array.from({ length: messages }).map((_, i) => ({
       me: i % 2 === 1,
-      w: [45, 60, 35, 70, 50, 40, 65, 55][i % 8], // varied widths
+      // Varied widths
+      w: [45, 60, 35, 70, 50, 40, 65, 55][i % 8],
     }));
 
     return (
@@ -487,22 +508,26 @@ const MessagePage: React.FC = () => {
   );
 
   /** --------------- Polling --------------- */
-  // INBOX polling (no flicker)
+  // Inbox polling (no flicker)
   React.useEffect(() => {
     if (!authed || conversationId) return;
-    fetchInbox(false); // initial with spinner
+    // Initial with spinner
+    fetchInbox(false);
     const id = window.setInterval(() => {
-      if (!document.hidden) fetchInbox(true); // silent merge
+      // Silent merge
+      if (!document.hidden) fetchInbox(true);
     }, 8000);
     return () => window.clearInterval(id);
   }, [authed, conversationId, fetchInbox]);
 
-  // CONVERSATION polling (no flicker)
+  // Convo polling (no flicker)
   React.useEffect(() => {
     if (!authed || !conversationId) return;
-    fetchMessages(false); // initial
+    // Initial with spinner
+    fetchMessages(false);
     const id = window.setInterval(() => {
-      if (!document.hidden) fetchMessages(true); // silent merge
+      // Silent merge
+      if (!document.hidden) fetchMessages(true);
     }, 2000);
     return () => window.clearInterval(id);
   }, [authed, conversationId, fetchMessages]);
@@ -510,7 +535,7 @@ const MessagePage: React.FC = () => {
   /** --------------- Read receipts: mark incoming as read --------------- */
   const maybeMarkRead = React.useCallback(async () => {
     if (!authed || !conversationId || !messages.length) return;
-    // Only do work if there’s at least one inbound unread
+    // Only do work if there's at least one inbound unread
     const hasInboundUnread = messages.some(
       (m) => m.recipient === myId && !(m.readBy || []).includes(myId)
     );
@@ -525,10 +550,10 @@ const MessagePage: React.FC = () => {
       // Update messages + inbox quietly
       fetchMessages(true);
       fetchInbox(true);
-      // Let NavBar refresh the global unread pill immediately (see step 3)
+      // Let NavBar refresh the global unread pill immediately
       window.dispatchEvent(new Event("messages:read"));
     } catch {
-      /* ignore */
+      // Ignore
     }
   }, [
     authed,
@@ -552,7 +577,7 @@ const MessagePage: React.FC = () => {
     return m0.sender === myId ? m0.recipient : m0.sender;
   }, [messages, myId]);
 
-  // Only the most recent of *my* messages that the other user has read shows "Seen"
+  // Only the most recent of user's messages that the other user has read shows "Seen"
   const lastSeenMyMsgId = React.useMemo(() => {
     if (!messages.length || !otherId) return null as string | null;
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -564,7 +589,7 @@ const MessagePage: React.FC = () => {
     return null;
   }, [messages, myId, otherId]);
 
-  /** --------------- Who am I chatting with? --------------- */
+  /** --------------- Get who the user is chatting with --------------- */
   const [otherUser, setOtherUser] = React.useState<OtherUser>(null);
 
   React.useEffect(() => {
@@ -572,20 +597,22 @@ const MessagePage: React.FC = () => {
     if (passed && !otherUser) setOtherUser(passed);
   }, [location.state, otherUser]);
 
-  // 1) Prefer the inbox row if we have it
+  // Prefer the inbox row if user has it
   React.useEffect(() => {
     if (!conversationId) return;
     const row = inbox.find((c) => String(c._id) === String(conversationId));
     if (row?.otherUser) setOtherUser(row.otherUser);
   }, [conversationId, inbox]);
 
-  // 2) If we still don’t know, fetch by otherId
+  // If still unknown, fetch by otherId
   React.useEffect(() => {
     let cancel = false;
     (async () => {
       if (!authed || !conversationId) return;
-      if (otherUser) return; // already known
-      if (!otherId) return; // need messages first
+      // Already known
+      if (otherUser) return;
+      // Need messages first
+      if (!otherId) return;
 
       try {
         const { data } = await axios.get<{
@@ -596,7 +623,7 @@ const MessagePage: React.FC = () => {
           isDeleted?: boolean;
         }>(`/api/users/${otherId}`);
 
-        // If backend marks the user as deleted, bounce to /messages.
+        // If backend marks the user as deleted, bounce to /messages
         if (data?.deleted || data?.isDeleted) {
           if (!cancel) navigate("/messages", { replace: true });
           return;
@@ -610,7 +637,7 @@ const MessagePage: React.FC = () => {
           });
         }
       } catch (err) {
-        // If the user record is gone (deleted), redirect to /messages.
+        // If the user record is gone (deleted), redirect to /messages
         if (!cancel) {
           const code = axios.isAxiosError(err)
             ? err.response?.status
@@ -618,7 +645,6 @@ const MessagePage: React.FC = () => {
           if (code === 404 || code === 410) {
             navigate("/messages", { replace: true });
           } else {
-            // Optional: on other errors you can stay or still redirect.
             navigate("/messages", { replace: true });
           }
         }
@@ -642,7 +668,8 @@ const MessagePage: React.FC = () => {
         { headers: authHeaders }
       );
       setDraft("");
-      await fetchMessages(true); // silent
+      // Silent
+      await fetchMessages(true);
       fetchInbox(true).catch(() => {});
     } catch (err) {
       console.error("send failed:", err);
@@ -678,7 +705,7 @@ const MessagePage: React.FC = () => {
   const imgSrc = (u?: string) =>
     !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
 
-  /** --------------- INBOX UI (/messages) --------------- */
+  /** --------------- Inbox UI (/messages) --------------- */
   if (!conversationId) {
     return (
       <div className="container">
@@ -721,7 +748,7 @@ const MessagePage: React.FC = () => {
                         Message others for their chats to appear here
                       </h5>
                       <p className="mb-0">
-                        Start a conversation from a user’s profile.
+                        Start a conversation from a user's profile.
                       </p>
                     </>
                   )}
@@ -791,17 +818,17 @@ const MessagePage: React.FC = () => {
     );
   }
 
-  /** --------------- CONVERSATION UI (/messages/:conversationId) --------------- */
+  /** --------------- Convo UI (/messages/:conversationId) --------------- */
   return (
     <div className="container">
       <style>{styles}</style>
       <div className="mx-auto mp-wrap" style={{ maxWidth: 820 }}>
         <div className="card mp-card border-0 shadow-sm mt-3">
-          {/* header */}
+          {/* Header */}
           <div className="mp-header border-bottom px-3 py-2 d-flex align-items-center justify-content-between">
             <div className="d-flex align-items-center" style={{ gap: 10 }}>
               <strong>Conversation</strong>
-              {/* inside the header, replace the non-clickable block */}
+              {/* Inside the header, replace the non-clickable block */}
               {otherUser && (
                 <Link
                   to={
@@ -839,7 +866,7 @@ const MessagePage: React.FC = () => {
             </div>
           </div>
 
-          {/* messages */}
+          {/* Messages */}
           <div ref={scrollRef} className="mp-scroll px-3 py-3">
             {loadingConvo && !convoLoaded ? (
               <ConversationThreadLoadingSkeleton />
@@ -868,7 +895,7 @@ const MessagePage: React.FC = () => {
             )}
           </div>
 
-          {/* composer */}
+          {/* Composer */}
           <div className="mp-input border-top p-2">
             <div className="d-flex align-items-center">
               <input
@@ -876,10 +903,12 @@ const MessagePage: React.FC = () => {
                 className="form-control"
                 placeholder="Type a message…"
                 value={draft}
-                onChange={(e) => setDraft(e.target.value.replace(/\r?\n/g, ""))} // strip pasted newlines
+                // Strip pasted newlines
+                onChange={(e) => setDraft(e.target.value.replace(/\r?\n/g, ""))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    e.preventDefault(); // block newlines
+                    // Block newlines
+                    e.preventDefault();
                     handleSend();
                   }
                 }}

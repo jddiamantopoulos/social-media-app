@@ -1,4 +1,15 @@
-// src/lib/pageStateCache.tsx
+/**
+ * Page-level state cache for React Router routes.
+ *
+ * Provides a usePageState hook that behaves like useState but scopes
+ * state to a specific browser history entry (page instance). State is
+ * cached in memory and mirrored to sessionStorage so it survives
+ * navigation, back/forward actions, and refreshes within the same tab.
+ *
+ * Also exposes:
+ *   - PageStateCacheProvider (in-memory cache context)
+ *   - useNewInstanceNav (helper to force a new page instance)
+ */
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -37,7 +48,7 @@ function ssDel(key: string) {
   } catch {}
 }
 
-// 1) Give each history entry its own stable page-instance id (pid)
+// Give each history entry its own stable page-instance id (pid)
 function usePageInstanceId() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -49,7 +60,7 @@ function usePageInstanceId() {
       : Math.random().toString(36).slice(2));
   const pidRef = React.useRef<string>(initialPid);
 
-  // Ensure the current history entry carries the pid (replace, not push)
+  // Ensure the current history entry carries the pid
   React.useEffect(() => {
     if (!(location.state as any)?.pid) {
       navigate(".", {
@@ -57,14 +68,14 @@ function usePageInstanceId() {
         state: { ...(location.state || {}), pid: pidRef.current },
       });
     }
-    // Run when path/search changes; not on back/forward (those already have state)
+    // Run when path/search changes, but not on back/forward since those already have state
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search]);
 
   return pidRef.current;
 }
 
-// 2) Build a fully qualified cache key for this page instance + subkey
+// Build a fully qualified cache key for this page instance + subkey
 function useFullKey(subkey: string) {
   const location = useLocation();
   const pid = usePageInstanceId();
@@ -74,12 +85,7 @@ function useFullKey(subkey: string) {
   );
 }
 
-/**
- * 3) usePageState: works like useState but is scoped to the *page instance*.
- *    - Restores from in-memory cache or sessionStorage
- *    - Saves to both on change
- *    - Returns [value, setValue, clear]
- */
+// Hook that works like useState scoped to a specific page instance; restores from memory/sessionStorage and persists on change
 export function usePageState<T>(
   subkey: string,
   initial: T | (() => T)
@@ -107,19 +113,15 @@ export function usePageState<T>(
   return [value, setValue, clear];
 }
 
-/**
- * 4) Helper: call this on links/buttons that should create a *new instance*
- *    (optional, because simply navigating via <Link to="..."> already
- *     creates a new history entry and the page will mint a new pid on mount.)
- */
+// Helper for links/buttons to create a new instance
 export function useNewInstanceNav() {
   const navigate = useNavigate();
   return React.useCallback(
     (to: string) => {
       navigate(to, {
-        // push a new entry; page will mint a new pid automatically
+        // Push a new entry; page will mint a new pid automatically
         replace: false,
-        state: {}, // no pid => new page instance will be created
+        state: {},
       });
     },
     [navigate]

@@ -1,4 +1,31 @@
-// src/components/Home.tsx
+/**
+ * Home feed page component.
+ *
+ * Purpose:
+ *   - Displays the main posts feed with pagination/infinite scroll and core post interactions.
+ *
+ * Key behaviors:
+ *   - Fetches paginated posts via cursor-based pagination (after/nextCursor)
+ *   - De-duplicates posts across pages and appends new results without reshuffling existing items
+ *   - Ranks only newly fetched pages using a session-stable scoring function (Wilson + time decay + small jitter)
+ *   - Supports optimistic UI for like/dislike reactions and post deletion
+ *   - Shows skeleton loading UI and an empty state when the feed has no posts
+ *
+ * Backend endpoints:
+ *   - GET    /api/posts                 (supports either legacy array response or { items, nextCursor })
+ *   - POST   /api/posts/:postId/like
+ *   - POST   /api/posts/:postId/dislike
+ *   - DELETE /api/posts/:postId
+ *
+ * State & storage:
+ *   - Reads auth token + user snapshot from localStorage
+ *   - Persists feed state using usePageState (posts, cursor, hasMore, seenIds, seed, scrollY)
+ *   - Also snapshots feed + scroll in sessionStorage keyed by location.key for back/forward restores
+ *
+ * Notes:
+ *   - The compatibility handling for multiple response shapes supports gradual backend changes without breaking the client.
+ *   - IntersectionObserver is used as the infinite-scroll sentinel with a large rootMargin for smoother loading.
+ */
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import axios from "axios";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -52,7 +79,7 @@ const wilsonLowerBound = (up: number, down: number, z = 1.281551565545) => {
   );
 };
 
-// tiny 32-bit string hash
+// Tiny 32-bit string hash
 const hash32 = (s: string) => {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) {
@@ -87,19 +114,17 @@ const Home: React.FC = () => {
   const [hasMore, setHasMore] = usePageState<boolean>("hasMore", true);
   const [isFetching, setIsFetching] = useState(false);
   const [seenIds, setSeenIds] = usePageState<string[]>("seenIds", []);
-  const seen = useRef<Set<string>>(new Set(seenIds)); // hydrate from page-state
+  // Hydrate from page-state
+  const seen = useRef<Set<string>>(new Set(seenIds));
 
-  // Optional overlay (kept from your file; currently not used by buttons below)
-  const [overlayPostId, setOverlayPostId] = useState<string | null>(null);
-
-  // Session-only seed; fixed for this mount (so ranking jitter is stable until refresh)
+  // Session-only seed so ranking jitter is stable until refresh
   const [seed] = usePageState<number>("seed", () =>
     Math.floor(Math.random() * 2 ** 32)
   );
 
   const [scrollY, setScrollY] = usePageState<number>("scrollY", 0);
 
-  // Per-history-entry keys (so each visit to /home gets its own snapshot)
+  // Per-history-entry keys so each visit to /home gets its own snapshot
   const HOME_CACHE_KEY = React.useMemo(
     () => `home:cache:${location.key}`,
     [location.key]
@@ -109,7 +134,7 @@ const Home: React.FC = () => {
     [location.key]
   );
 
-  // Stable session seed for ranking (must be defined before using it)
+  // Stable session seed for ranking
   const seedRef = useRef<number | undefined>(undefined);
   if (seedRef.current === undefined) {
     seedRef.current = Math.floor(Math.random() * 2 ** 32);
@@ -123,7 +148,7 @@ const Home: React.FC = () => {
   }, [navigate]);
 
   // On real reload (or direct open), bump ?nv=.
-  // On back/forward restore (bfcache), DO NOTHING (keeps saved state).
+  // On back/forward restore (bfcache), do nothing (keeps saved state).
   React.useEffect(() => {
     if (!location.pathname.startsWith("/home")) return;
 
@@ -135,14 +160,15 @@ const Home: React.FC = () => {
       entry?.type === "reload" || (performance as any).navigation?.type === 1;
 
     const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) return; // back/forward: keep state, don't bump
+      // Back/forward: keep state, don't bump
+      if (e.persisted) return;
       if (!hasNv) {
-        // direct open of /home
+        // Direct open of /home
         bumpHomeNv();
         return;
       }
       if (isReload) {
-        // manual reload of /home
+        // Manual reload of /home
         bumpHomeNv();
       }
     };
@@ -171,7 +197,8 @@ const Home: React.FC = () => {
         setHasMore(Boolean(d.hasMore));
         if (typeof d.seed === "number") seedRef.current = d.seed;
         seen.current = new Set(d.seen ?? []);
-        setLoading(false); // IMPORTANT: skip the initial refetch
+        // Skip the initial refetch
+        setLoading(false);
 
         const yRaw = sessionStorage.getItem(HOME_SCROLL_KEY);
         const y = Number.isFinite(Number(yRaw)) ? Number(yRaw) : d.windowY ?? 0;
@@ -180,7 +207,7 @@ const Home: React.FC = () => {
         });
       }
     } catch {
-      // ignore
+      // Ignore
     }
   }, []);
 
@@ -198,7 +225,7 @@ const Home: React.FC = () => {
         })
       );
     } catch {
-      // ignore
+      // Ignore
     }
   }, [posts, cursor, hasMore]);
 
@@ -221,11 +248,11 @@ const Home: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // restore
+    // Restore
     requestAnimationFrame(() => {
       window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
     });
-    // keep updated (rAF-throttled)
+    // Keep updated (rAF-throttled)
     let raf = 0;
     const onScroll = () => {
       if (raf) return;
@@ -239,7 +266,8 @@ const Home: React.FC = () => {
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [setScrollY]); // intentionally not depending on scrollY
+  }, [setScrollY]);
+  // Not depending on scrollY
 
   useEffect(() => {
     if (!loading) return;
@@ -247,7 +275,7 @@ const Home: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
-  // ————— minimal, icon-only UI helpers —————
+  // Minimal, icon-only UI helpers
   const styles = `
   .icon-btn {
     background: none; border: 0; padding: 4px; margin: 0; line-height: 1;
@@ -286,7 +314,7 @@ const Home: React.FC = () => {
   }
   `;
 
-  /** Rank a list once (per page) with your scoring; returns IDs in display order */
+  /** Rank a list once (per page) with scoring; returns IDs in display order */
   function rankOnce(
     list: Post[],
     opts: { seed: number; myId: string; loggedIn: boolean }
@@ -301,7 +329,7 @@ const Home: React.FC = () => {
 
     // Gumbel noise for a nice "lottery" effect per session, strength tuned small
     const gumbelFrom = (u: number) => -Math.log(-Math.log(Math.max(1e-9, u)));
-    const JITTER_STRENGTH = 0.25; // try 0.15–0.35
+    const JITTER_STRENGTH = 0.25;
 
     const rows = list.map((p) => {
       const up = p.likes?.length ?? 0;
@@ -357,7 +385,7 @@ const Home: React.FC = () => {
     return rows.map((r) => r.p._id);
   }
 
-  /** Fetch a page; append (don’t reshuffle existing), de-dup, and advance cursor */
+  /** Fetch a page; append (don't reshuffle existing), de-dup, and advance cursor */
   const fetchPosts = async (after: string | null = null) => {
     if (isFetching || (!after && !hasMore && posts.length)) return;
     setIsFetching(true);
@@ -365,7 +393,8 @@ const Home: React.FC = () => {
       const res = await axios.get("/api/posts", {
         params: {
           limit: 20,
-          after: after ?? undefined /* seed: seedRef.current */,
+          // Seed: seedRef.current
+          after: after ?? undefined,
         },
       });
 
@@ -465,8 +494,6 @@ const Home: React.FC = () => {
       );
     } catch (err) {
       console.error("React error:", err);
-      // optional: refetch to revert server truth
-      // await fetchPosts(null);
     }
   };
 
@@ -474,7 +501,7 @@ const Home: React.FC = () => {
     if (!token) return alert("Please log in.");
     if (!window.confirm("Delete this post? This cannot be undone.")) return;
 
-    // optimistic remove + de-dup cleanup
+    // Optimistic remove + de-dup cleanup
     setPosts((prev: Post[]) => prev.filter((p) => p._id !== postId));
     seen.current.delete(postId);
     setSeenIds(Array.from(seen.current));
@@ -486,7 +513,6 @@ const Home: React.FC = () => {
     } catch (err) {
       console.error("Delete error:", err);
       alert("Failed to delete post.");
-      // optional: refetch current pages
     }
   };
 
@@ -708,7 +734,7 @@ const Home: React.FC = () => {
                 />
               )}
 
-              {/* Footer: reactions (icon + count, no filled buttons) */}
+              {/* Footer: reactions (icon + count) */}
               <div className="card-footer d-flex justify-content-between align-items-center">
                 <div>
                   <button

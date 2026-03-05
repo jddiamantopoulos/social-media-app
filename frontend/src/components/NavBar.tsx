@@ -1,4 +1,33 @@
-// src/components/NavBar.tsx
+/**
+ * Global navigation bar component (desktop navbar + mobile drawer).
+ *
+ * Purpose:
+ *   - Provides primary app navigation, global search, notifications, and logout access.
+ *
+ * Key behaviors:
+ *   - Tracks and persists the active navbar tab (sessionStorage) and keeps it stable on non-navbar routes
+ *   - Provides a debounced global search (/api/search) with keyboard navigation (Up/Down/Enter/Escape)
+ *   - Renders notifications dropdown (desktop) + notifications card (mobile drawer) and supports "mark all read"
+ *   - Fetches and displays unread message count and refreshes it on an app-wide "messages:read" event
+ *   - Supports a React-only mobile drawer that auto-closes on resize to desktop widths
+ *   - Normalizes avatar/post image URLs using VITE_API_URL for relative backend paths
+ *
+ * Backend endpoints:
+ *   - GET  /api/search?q=&limit=
+ *   - GET  /api/notifications
+ *   - POST /api/notifications/read-all
+ *   - POST /api/notifications/:id/read
+ *   - GET  /api/messages/unread-count
+ *
+ * State & storage:
+ *   - Reads auth token + user snapshot from localStorage
+ *   - Persists activeNav in sessionStorage ("activeNav") to keep navbar highlight consistent across refreshes
+ *
+ * Notes:
+ *   - Uses document-level outside-click handlers to close search suggestions and notifications popovers.
+ *   - Debounced search requests (250ms) reduce API chatter while typing.
+ *   - Notifications UI currently shows unread-only for a simpler, less noisy dropdown.
+ */
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
@@ -51,7 +80,8 @@ const pathToNavKey = (path: string): NavKey | null => {
   if (path === "/about") return "about";
   if (path === "/login") return "login";
   if (path === "/signup") return "signup";
-  return null; // non-navbar routes (posts, users, comments, etc.)
+  // Non-navbar routes (posts, users, comments, etc.)
+  return null;
 };
 
 type Notif = {
@@ -86,7 +116,7 @@ const NavBar: React.FC = () => {
     window.location.assign("/home");
   };
 
-  // Map notif type → label
+  // Map notif type -> label
   function labelFor(type: NotifType): string {
     switch (type) {
       case "comment_like":
@@ -109,8 +139,10 @@ const NavBar: React.FC = () => {
 
   // --- Search state ---
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false); // results dropdown
-  const [searchOpen, setSearchOpen] = useState(false); // slide-out input
+  // Results dropdown
+  const [open, setOpen] = useState(false);
+  // Slide-out input
+  const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<SearchItem[]>([]);
   const [highlight, setHighlight] = useState<number>(-1);
@@ -149,7 +181,7 @@ const NavBar: React.FC = () => {
   useEffect(() => {
     const k = pathToNavKey(location.pathname);
     if (k && k !== activeNav) setActiveNav(k);
-    // NOTE: when on non-navbar routes, we do nothing (highlight stays)
+    // Note: when on non-navbar routes, do nothing (highlight stays)
   }, [location.pathname]);
 
   const [msgUnread, setMsgUnread] = useState(0);
@@ -166,39 +198,35 @@ const NavBar: React.FC = () => {
       });
       setMsgUnread(Number(data?.count || 0));
     } catch (e) {
-      // fail silently
+      // Ignore
     }
   };
 
-  // after you define fetchMsgUnread()
   React.useEffect(
     () => {
       const onRead = () => fetchMsgUnread();
       window.addEventListener("messages:read", onRead);
       return () => window.removeEventListener("messages:read", onRead);
-    },
-    [
-      /* no deps or [fetchMsgUnread] if defined inline */
-    ]
-  );
+    }, []);
 
   useEffect(() => {
     fetchMsgUnread();
-    const id = window.setInterval(fetchMsgUnread, 45000); // ~45s like notifications
+    // ~45s like notifications
+    const id = window.setInterval(fetchMsgUnread, 45000);
     return () => window.clearInterval(id);
   }, [isLoggedIn]);
 
   // Emoji + search styles + drawer styles
   const styles = `
-    /* Make the navbar bar use our primary var directly */
+    /* Make the navbar bar use primary var directly */
     .navbar.bg-primary,
     .bg-primary{
       background-color: var(--bs-primary) !important;
     }
 
-    .brand-img { height: 40px; } /* adjust logo size */
+    .brand-img { height: 40px; }
 
-    /* Dim-by-default brand logo; brighten on hover/active (like .nav-emoji) */
+    /* Dim-by-default brand logo; brighten on hover/active */
     .navbar-brand .brand-img{
       filter: saturate(0.7) brightness(0.9);
       transition: filter .15s ease, transform .12s ease;
@@ -264,8 +292,8 @@ const NavBar: React.FC = () => {
     /* Single, positioned badge for the desktop bell */
     .nav-item .notif-badge{
       position: absolute;
-      top: 6px;          /* tweak for your navbar height */
-      right: -2px;       /* tweak horizontally */
+      top: 6px;
+      right: -2px;
       transform: translate(50%, -50%);
       font-size: .65rem;
       line-height: 1;
@@ -275,16 +303,17 @@ const NavBar: React.FC = () => {
     .navbar-toggler{
       border: 0 !important;
       box-shadow: none !important;
-      padding: .75rem .95rem;        /* bigger tap target */
+      padding: .75rem .95rem;
     }
 
     /* Bigger icon; animate only the glow */
     .navbar-toggler .navbar-toggler-icon{
-      width: 1.9rem;                  /* was ~1.5rem */
+      width: 1.9rem;
       height: 1.9rem;
       background-size: 100% 100%;
       transition: filter .15s ease;
-      filter: drop-shadow(0 0 0 transparent); /* base: no glow */
+      /* Base: no glow */
+      filter: drop-shadow(0 0 0 transparent);
     }
 
     /* Glow on hover/focus (keeps it perfectly still) */
@@ -294,7 +323,7 @@ const NavBar: React.FC = () => {
               drop-shadow(0 0 2px rgba(255,255,255,.9));
     }
 
-    /* Optional: if you ever use navbar-light on a light bg */
+    /* Navbar-light on a light bg */
     .navbar-light .navbar-toggler:hover .navbar-toggler-icon,
     .navbar-light .navbar-toggler:focus-visible .navbar-toggler-icon{
       filter: drop-shadow(0 0 6px rgba(0,0,0,.35))
@@ -303,13 +332,14 @@ const NavBar: React.FC = () => {
 
     /*.nav-badge {
       position: absolute;
-      bottom: -5px;   /* tweak to taste */
-      right: -6px;    /* tweak to taste */
+      bottom: -5px;
+      right: -6px;
       padding: 0.30rem 0.47rem;
     }*/
 
-      /* ===== Desktop notifications dropdown ===== */
-    .notif-menu {               /* add breathing room inside the dropdown */
+    /* ===== Desktop notifications dropdown ===== */
+    /* Add breathing room inside the dropdown */
+    .notif-menu {
       padding: 8px;
     }
 
@@ -367,7 +397,7 @@ const NavBar: React.FC = () => {
       width:3px; background: var(--bs-primary); border-radius:3px;
     }
 
-    /* Muted text uses theme’s muted color */
+    /* Muted text uses theme's muted color */
     .notif-menu .text-muted{ color: var(--bs-secondary-color) !important; }
 
     /* Avatar sizing for consistency */
@@ -381,8 +411,8 @@ const NavBar: React.FC = () => {
     .notif-menu .flex-grow-1 { min-width: 0 !important; }
     .notif-menu .text-wrap { overflow: hidden; }
     .notif-menu .text-wrap .text-break {
-      display: inline;          /* revert */
-      vertical-align: baseline; /* (explicit) */
+      display: inline;
+      vertical-align: baseline;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -392,7 +422,7 @@ const NavBar: React.FC = () => {
     /* Drawer notifications list uses the same vars */
     .drawer-notif-list{
       padding: 8px;
-      background: transparent; /* parent is a .card */
+      background: transparent;
     }
     .drawer-notif-list .list-group-item{
       border: 0 !important;
@@ -454,7 +484,7 @@ const NavBar: React.FC = () => {
       color: #fff;
     }
 
-    /* “Searching… / No results” rows that use .text-muted */
+    /* "Searching… / No results" rows that use .text-muted */
     .search-box .dropdown-menu .text-muted,
     #mobileDrawer .dropdown-menu .text-muted{
       color: var(--dropdown-item-muted) !important;
@@ -471,10 +501,10 @@ const NavBar: React.FC = () => {
     .drawer-list{
       display: flex;
       flex-direction: column;
-      gap: 12px;              /* <- this controls the equal spacing */
+      gap: 12px;
     }
 
-    /* Tidy up each row look (optional) */
+    /* Tidy up each row look */
     .mobile-drawer .drawer-item{
       padding: 15px 6px;
       border-radius: 8px;
@@ -500,40 +530,14 @@ const NavBar: React.FC = () => {
       opacity: 1;
     }
 
-    /* Optional: a tiny hover bg so the row feels interactive */
+    /* Tiny hover bg so the row feels interactive */
     #mobileDrawer .drawer-item:hover{
       background: var(--dropdown-hover-bg);
       border-radius: 8px;
     }
   `;
 
-  // Refresh-if-same helper (kept, but we'll switch desktop/drawer links to goNav)
-  const handleNavClick =
-    (to: string) =>
-    (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
-      setOpen(false);
-      setQ("");
-      setItems([]);
-      setHighlight(-1);
-      setNotifOpen(false);
-      setSearchOpen(false);
-      closeMenu();
-
-      if (location.pathname === to) {
-        e.preventDefault();
-        navigate(0);
-      }
-    };
-
-  const goSameAware = (path: string) => {
-    setNotifOpen(false);
-    const current = location.pathname + location.search + location.hash;
-    if (current === path) navigate(0);
-    else navigate(path);
-    closeMenu();
-  };
-
-  // shared helpers to clear search & always navigate
+  // Shared helpers to clear search & always navigate
   const clearSearch = () => {
     setQ("");
     setOpen(false);
@@ -547,9 +551,9 @@ const NavBar: React.FC = () => {
     clearSearch();
     closeMenu();
 
-    // mark last selected navbar tab (but NOT for posts/users/comments pages)
+    // Mark last selected navbar tab (but not for posts/users/comments pages)
     const k = pathToNavKey(path);
-    if (k) setActiveNav(k); // persisted by the effect above
+    if (k) setActiveNav(k);
 
     const current = location.pathname + location.search + location.hash;
 
@@ -676,9 +680,10 @@ const NavBar: React.FC = () => {
   }, [menuOpen]);
 
   const go = (item: SearchItem) => {
-    clearSearch(); // unified clearing
+    // Unified clearing
+    clearSearch();
 
-    // build target path
+    // Build target path
     const path =
       item.type === "user"
         ? item._id === me.id
@@ -688,7 +693,7 @@ const NavBar: React.FC = () => {
 
     setActiveNav("search");
 
-    // navigate or hard-refresh if already there
+    // Navigate or hard-refresh if already there
     goNav(path);
   };
 
@@ -775,19 +780,18 @@ const NavBar: React.FC = () => {
   };
 
   /** ---- Notifications helpers ---- */
-  const computeUnread = (arr: Notif[]) =>
-    arr.reduce((n, it) => n + (it.read ? 0 : 1), 0);
 
   const fetchNotifications = async () => {
     if (!isLoggedIn) return;
     setNotifLoading(true);
     try {
       const { data } = await axios.get("/api/notifications", {
-        // no 'limit' param -> let the server return everything (or its default)
+        // No 'limit' param -> let the server return everything (or its default)
         headers: getAuthHeaders(),
       });
       const all: Notif[] = Array.isArray(data) ? data : [];
-      const unreadOnly = all.filter((n) => !n.read); // keep only unread in UI
+      // Keep only unread in UI
+      const unreadOnly = all.filter((n) => !n.read);
       setNotifs(unreadOnly);
       setUnread(unreadOnly.length);
     } catch (e) {
@@ -852,8 +856,9 @@ const NavBar: React.FC = () => {
 
     if (n.post?._id) {
       if (opensComments(n.type)) {
-        // Go to comments overlay; remember where we came from
-        closeMenu(); // ensure drawer closes on mobile
+        // Go to comments overlay; remember where user came from
+        // Ensure drawer closes on mobile
+        closeMenu();
         navigate(`/posts/${n.post._id}/comments`, {
           state: { backgroundLocation: location },
         });
@@ -887,7 +892,7 @@ const NavBar: React.FC = () => {
       >
         <style>{styles}</style>
         <div className="container">
-          {/* Brand image (replace src with your logo) */}
+          {/* Brand image */}
           <Link
             className={`navbar-brand d-flex align-items-center ${
               pathToNavKey(location.pathname) === "about" ? "active" : ""
@@ -906,7 +911,7 @@ const NavBar: React.FC = () => {
             />
           </Link>
 
-          {/* React-only hamburger toggles our drawer */}
+          {/* React-only hamburger toggles the drawer */}
           <button
             className="navbar-toggler"
             type="button"
@@ -924,7 +929,7 @@ const NavBar: React.FC = () => {
               className="ms-auto d-flex align-items-center"
               style={{ gap: "6px" }}
             >
-              {/* Slide-out Search (input sits LEFT of the 🔎) */}
+              {/* Slide-out Search (input sits left of the search toggle button) */}
               <div className="search-toggle">
                 <div
                   ref={wrapRefDesktop}
@@ -968,7 +973,7 @@ const NavBar: React.FC = () => {
                   )}
                 </div>
 
-                {/* 🔎 brightens when searchOpen or hover */}
+                {/* Search toggle button brightens when searchOpen or hover */}
                 <button
                   type="button"
                   className={`btn btn-link nav-link p-0 ${
@@ -991,7 +996,7 @@ const NavBar: React.FC = () => {
               <ul className="navbar-nav">
                 {isLoggedIn && (
                   <li className="nav-item position-relative" ref={notifWrapRef}>
-                    {/* brightens when notifOpen or hover */}
+                    {/* Brightens when notifOpen or hover */}
                     <button
                       className={`btn btn-link nav-link d-flex ${
                         notifOpen || activeNav === "notifications"

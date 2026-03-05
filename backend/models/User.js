@@ -1,4 +1,11 @@
-// models/User.js
+/**
+ * User schema for authentication and social relationships.
+ *
+ * Stores core account credentials and profile metadata, along with
+ * follower/following references for building the social graph.
+ *
+ * Enforces case-insensitive unique usernames via indexed collation.
+ */
 const { Schema } = require("mongoose");
 
 const UserSchema = new Schema(

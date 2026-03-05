@@ -1,4 +1,12 @@
-// routes/notification.js
+/**
+ * Notification routes for the activity feed/bell icon.
+ *
+ * Supports:
+ *   - listing recent notifications (used by NavBar)
+ *   - marking notifications as read (single + mark-all)
+ *
+ * Uses verifyToken for authentication and tenant-bound models (req.models).
+ */
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/verifyToken");

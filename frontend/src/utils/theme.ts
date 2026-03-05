@@ -1,4 +1,16 @@
-// src/utils/theme.ts
+/**
+ * Runtime theme system for the application.
+ *
+ * Provides:
+ *   - A persisted user theme choice (mode + primary accent) via localStorage
+ *   - A single `applyTheme()` entry point that maps the choice onto CSS custom properties
+ *     (Bootstrap tokens + app-specific tokens) and injects a small override stylesheet
+ *
+ * Design notes:
+ *   - Keeps Bootstrap variables (`--bs-*`) in sync so existing Bootstrap classes respond to theme changes.
+ *   - Sets `color-scheme` so native controls (inputs, autofill, etc.) render correctly in light/dark mode.
+ *   - Centralizes danger/primary palettes to ensure consistent hover/focus styling across the app.
+ */
 export type ThemeMode = 'light' | 'dark';
 export type PrimaryKey =
   | 'blue' | 'violet' | 'green' | 'orange' | 'red' | 'teal' | 'magenta' | 'yellow';
@@ -33,7 +45,8 @@ const KEY = 'theme-choice';
 
 export function loadTheme(): ThemeChoice {
   try { return JSON.parse(localStorage.getItem(KEY) || '') as ThemeChoice; } catch {}
-  return { mode: 'light', primary: 'blue' }; // default
+  // Default
+  return { mode: 'light', primary: 'blue' };
 }
 export function saveTheme(t: ThemeChoice) { localStorage.setItem(KEY, JSON.stringify(t)); }
 
@@ -42,7 +55,7 @@ export function applyTheme(t: ThemeChoice) {
   const p = PRIMARY[t.primary];
   const m = MODE[t.mode];
 
-  // helper to turn #hex into "r,g,b"
+  // Helper to turn #hex into "r,g,b"
   const toRGB = (hex: string) => {
     const h = hex.replace('#','');
     const v = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
@@ -51,7 +64,7 @@ export function applyTheme(t: ThemeChoice) {
   };
 
   // ---- Danger palette (darker & unified) ----
-  const dangerStrong       = '#881925'; // darker crimson
+  const dangerStrong       = '#881925';
   const dangerStrongHover  = '#4e0e14ff';
 
   root.style.setProperty('--danger-strong', dangerStrong);
@@ -60,7 +73,8 @@ export function applyTheme(t: ThemeChoice) {
   // Keep Bootstrap's tokens in sync so .text-danger/.badge/bg-danger/etc. track it
   root.style.setProperty('--bs-danger', dangerStrong);
   root.style.setProperty('--bs-danger-rgb', toRGB(dangerStrong));
-  root.style.setProperty('--bs-danger-text-emphasis', dangerStrong); // ensure text uses same shade
+  // Ensure text uses same shade
+  root.style.setProperty('--bs-danger-text-emphasis', dangerStrong);
 
   // Primary/accent
   root.style.setProperty('--bs-primary', p.base);
@@ -122,7 +136,7 @@ export function applyTheme(t: ThemeChoice) {
     t.mode === 'dark' ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.03)'
   );
 
-  // action/hovers/actives
+  // Action/hovers/actives
   root.style.setProperty('--bs-list-group-action-color', m.text);
   root.style.setProperty('--bs-list-group-action-hover-color', m.text);
   root.style.setProperty(
@@ -202,18 +216,18 @@ export function applyTheme(t: ThemeChoice) {
     .form-select,
     .form-select:focus,
     textarea.form-control{
-      /* set the variables Bootstrap reads */
+      /* Set the variables Bootstrap reads */
       --bs-form-control-bg: ${m.input};
       --bs-body-color: ${m.text};
       --bs-border-color: ${m.border};
 
-      /* force the properties so it darkens even if other rules exist */
+      /* Force the properties so it darkens even if other rules exist */
       background-color: var(--bs-form-control-bg) !important;
       color: var(--bs-body-color) !important;
       border-color: var(--bs-border-color) !important;
     }
 
-    /* Buttons: force them to use our theme vars */
+    /* Buttons: force them to use theme vars */
     .btn-primary{
       background-color: var(--bs-primary) !important;
       border-color: var(--bs-primary) !important;
@@ -260,7 +274,7 @@ export function applyTheme(t: ThemeChoice) {
     select:-webkit-autofill:focus{
       -webkit-text-fill-color: var(--bs-body-color) !important;
       caret-color: var(--bs-body-color);
-      /* Paint over the browser’s white/yellow with your input bg */
+      /* Paint over the browser's default with input bg */
       -webkit-box-shadow: 0 0 0px 1000px var(--bs-form-control-bg) inset !important;
       box-shadow: 0 0 0px 1000px var(--bs-form-control-bg) inset !important;
       border-color: var(--bs-border-color) !important;
@@ -300,14 +314,13 @@ export function applyTheme(t: ThemeChoice) {
       border-color: var(--bs-primary);
     }
 
-    /* Optional: keep other surfaces consistent */
+    /* Keep other surfaces consistent */
     .dropdown-menu{ --bs-dropdown-bg: ${m.card}; }
     .modal-content{ --bs-modal-bg: ${m.card}; --bs-modal-color: ${m.text}; }
     .offcanvas{ --bs-offcanvas-bg: ${m.card}; }
 
     /* ===== Darker, unified danger ===== */
 
-    /* Buttons – set vars only, let :hover swap to hover color */
     .btn-danger{
       --bs-btn-bg: var(--danger-strong);
       --bs-btn-border-color: var(--danger-strong);
@@ -344,19 +357,19 @@ export function applyTheme(t: ThemeChoice) {
       color: #fff !important;
     }
 
-    /* If you use the newer badge utility */
+    /* New badge utility */
     .text-bg-danger{
       background-color: var(--bs-danger) !important;
       color: #fff !important;
     }
 
-    /* Make the section title match the button exactly */
+    /* Section title matches button exactly */
     .danger-zone-title{
       color: var(--danger-strong) !important;
     }
   `;
 
-  // Elevation used in your components
+  // Elevation used in components
   root.style.setProperty('--elev-2-shadow',
     t.mode === 'light' ? '0 8px 20px rgba(0,0,0,.06)' : '0 8px 20px rgba(0,0,0,.6)'
   );

@@ -1,10 +1,19 @@
-// src/utils/timeAgo.ts
+/**
+ * Lightweight relative time formatter.
+ *
+ * Converts a date or timestamp into a short, human-readable
+ * "time ago" string (e.g., 45s, 12m, 3h, 5d, 2w, 6mo, 1y).
+ *
+ * Designed for feed, comment, and notification timestamps where
+ * compact display is preferred over full locale formatting.
+ */
 export function timeAgo(iso: string | number | Date): string {
   const then = new Date(iso).getTime();
   const now = Date.now();
   let diffSeconds = Math.floor((now - then) / 1000);
 
-  if (diffSeconds < 1) diffSeconds = 1; // minimum 1 second
+  // Minimum 1 second
+  if (diffSeconds < 1) diffSeconds = 1;
 
   const minutes = Math.floor(diffSeconds / 60);
 
@@ -13,12 +22,12 @@ export function timeAgo(iso: string | number | Date): string {
     return `${diffSeconds}s`;
   }
 
-  // thresholds (in minutes)
+  // Thresholds (in minutes)
   const HOUR = 60;
   const DAY = 1440;       // 24 * 60
   const WEEK = 10080;     // 7 * 1440
-  const MONTH = 43800;    // ≈ 30.44 days
-  const YEAR = 525960;    // ≈ 365.25 days
+  const MONTH = 43800;    // about 30.44 days
+  const YEAR = 525960;    // about 365.25 days
 
   if (minutes < HOUR) return `${minutes}m`;
   if (minutes < DAY) return `${Math.floor(minutes / HOUR)}h`;

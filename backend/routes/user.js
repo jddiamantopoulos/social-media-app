@@ -1,4 +1,17 @@
-// routes/user.js
+/**
+ * User profile and social interaction routes.
+ *
+ * Supports:
+ *   - uploading and updating user avatars (Cloudinary-backed)
+ *   - fetching the authenticated user's profile and follower/following counts
+ *   - updating profile descriptions with length/safety constraints
+ *   - viewing public user profiles
+ *   - following and unfollowing other users (with notifications)
+ *   - retrieving followers and following lists
+ *
+ * Uses verifyToken for authentication, multer for temporary file handling,
+ * Cloudinary for media storage, and tenant-bound models (req.models).
+ */
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/verifyToken");
@@ -7,19 +20,7 @@ const fs = require("fs");
 const multer = require("multer");
 const { cloudinary } = require("../lib/cloudinary");
 
-// --- helpers: only delete if it was a local file previously ---
-function removeFileIfLocal(url) {
-  if (!url || !url.startsWith("/uploads/")) return;   // ignore Cloudinary URLs
-  const abs = path.join(process.cwd(), url.replace(/^\//, ""));
-  fs.stat(abs, (err, st) => { if (!err && st.isFile()) fs.unlink(abs, () => {}); });
-}
-
-// --- simple URL check (accept http/https only) ---
-function isHttpUrl(s = "") {
-  return /^https?:\/\//i.test(String(s).trim());
-}
-
-// Multer temp storage (uses req.user.id in filename)
+// Multer temp storage
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, path.join(process.cwd(), "tmp")),
@@ -31,10 +32,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
-/** POST /api/user/avatar
- *  Body: { photoUrl: "https://res.cloudinary.com/<cloud>/image/upload/...jpg" }
- *  Replaces previous local avatar (if any) and saves the new absolute URL.
- */
+/** POST /api/user/avatar */
 router.post("/user/avatar", verifyToken, upload.single("avatar"), async (req, res) => {
   try {
     const { User } = req.models;
@@ -43,17 +41,18 @@ router.post("/user/avatar", verifyToken, upload.single("avatar"), async (req, re
 
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-    // 1) Upload to Cloudinary
+    // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: `${process.env.CLOUDINARY_FOLDER || "social-media-app"}/avatars`,
-      public_id: req.user.id,  // stable name per user
+      // Stable name per user
+      public_id: req.user.id,
       overwrite: true,
     });
 
-    // 2) Clean up temp file
+    // Clean up temp file
     try { fs.unlink(req.file.path, () => {}); } catch {}
 
-    // 3) Save URL
+    // Save URL
     me.photoUrl = result.secure_url;
     await me.save();
 
@@ -163,7 +162,7 @@ router.post("/users/:id/follow", verifyToken, async (req, res) => {
         User.updateOne({ _id: targetId }, { $addToSet: { followers: meId } }),
       ]);
 
-      // notify target
+      // Notify target
       try {
         await Notification.create({
           recipient: targetId,

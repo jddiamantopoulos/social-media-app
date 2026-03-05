@@ -1,4 +1,18 @@
-// src/main.tsx
+/**
+ * Client entrypoint.
+ *
+ * What this file does:
+ *   - Boots the React app, mounts <App /> into #root, and applies the saved theme.
+ *   - Configures Axios defaults used across the frontend (baseURL + X-Tenant header).
+ *   - Selects a "dataset/tenant" (resume vs friends) using a priority order:
+ *       1) one-time URL override (?db=friends|resume) -> persisted to localStorage
+ *       2) persisted localStorage value (dbKey)
+ *       3) host-based default (friends.* -> friends)
+ *       4) fallback default ("resume")
+ *   - Exposes a dev-friendly global switcher (window.setDb) that flips datasets, clears auth/session
+ *     state to prevent cross-tenant bleed, and hard-navigates so the app remounts cleanly.
+ *   - (Dev-only) logs Axios requests/responses for quick debugging.
+ */
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -6,16 +20,15 @@ import { applyTheme, loadTheme } from "./utils/theme";
 import "bootstrap/dist/css/bootstrap.css";
 import axios from "axios";
 
-// ---- Dataset selection (sticky + host-aware) --------------------------------
-type DbKey = "friends" | "resume" | "default";
-const VALID_KEYS: DbKey[] = ["friends", "resume", "default"];
-const DEFAULT_DB: DbKey = "default";
+// ---- Dataset selection (sticky + host-aware) ----
+type DbKey = "resume" | "friends";
+const VALID_KEYS: DbKey[] = ["resume", "friends"];
+const DEFAULT_DB: DbKey = "resume";
 
-// Prefer host → one-time ?db= override -> stored -> default
+// Prefer host -> one-time ?db= override -> stored -> default
 function pickDbFromHost(): DbKey | null {
   const h = window.location.hostname.toLowerCase();
   if (h.startsWith("friends.")) return "friends";
-  if (h.startsWith("resume."))  return "resume";
   return null;
 }
 
@@ -24,7 +37,7 @@ function pickDbFromUrlOnce(): DbKey | null {
   const raw = (url.searchParams.get("db") || "").toLowerCase() as DbKey;
   if (!VALID_KEYS.includes(raw)) return null;
 
-  // persist and clean the URL (no reload)
+  // Persist and clean the URL (no reload)
   localStorage.setItem("dbKey", raw);
   url.searchParams.delete("db");
   window.history.replaceState({}, "", url.toString());
@@ -40,11 +53,10 @@ const dbKey: DbKey = fromUrl ?? stored ?? fromHost ?? DEFAULT_DB;
 // Set a default header that the backend reads in pickTenant()
 axios.defaults.headers.common["X-Tenant"] = dbKey;
 
-// Optional: set baseURL (use Vite env or same-origin)
+// Set baseURL using Vite env or same-origin
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || "/api";
 
-// Quick global switcher you can call from the console or a settings UI:
-//   window.setDb("friends")
+// Quick global switcher that can be called from the console or a settings UI
 declare global {
   interface Window {
     setDb?: (key: DbKey) => void;
@@ -64,17 +76,17 @@ window.setDb = (key: DbKey) => {
   window.location.assign("/home");
 };
 
-// Optional: expose current dataset for debugging/CSS hooks
+// Expose current dataset for debugging/CSS hooks
 document.documentElement.setAttribute("data-db", dbKey);
 console.info(`[App] Using dataset: ${dbKey}`);
 
-// ---- Theme + mount -----------------------------------------------------------
+// ---- Theme + mount ----
 applyTheme(loadTheme());
 
-// DEV ONLY: remove later if noisy
+// Dev-only tool; logs Axios requests/responses for debugging
 axios.interceptors.request.use((cfg) => {
   console.log(
-    "[API →]",
+    "[API ->]",
     cfg.method?.toUpperCase(),
     (cfg.baseURL || "") + (cfg.url || "")
   );
@@ -82,12 +94,12 @@ axios.interceptors.request.use((cfg) => {
 });
 axios.interceptors.response.use(
   (res) => {
-    console.log("[API ✓]", res.status, res.config.url);
+    console.log("[API Y]", res.status, res.config.url);
     return res;
   },
   (err) => {
     const r = err.response;
-    console.warn("[API ✗]", r?.status, r?.config?.url, r?.data || err.message);
+    console.warn("[API N]", r?.status, r?.config?.url, r?.data || err.message);
     return Promise.reject(err);
   }
 );

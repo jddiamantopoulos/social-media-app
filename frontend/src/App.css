@@ -30,7 +30,7 @@ a:hover { color: var(--bs-link-hover-color); }
   color: var(--bs-primary) !important;
 }
 
-/* Buttons already mapped; keep this if you added it earlier */
+/* Buttons already mapped */
 .btn-primary{
   --bs-btn-bg: var(--bs-primary);
   --bs-btn-border-color: var(--bs-primary);

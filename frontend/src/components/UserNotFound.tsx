@@ -1,4 +1,27 @@
-// src/components/empties/UserNotFound.tsx
+/**
+ * User-not-found empty-state page.
+ *
+ * Purpose:
+ *   - Displays a friendly fallback UI when a requested user profile
+ *     cannot be found or no longer exists.
+ *
+ * Key behaviors:
+ *   - Shows an explanatory message for missing/deleted users
+ *   - Provides a "Go back" action using browser history
+ *   - Preserves app layout consistency with other empty/error states
+ *
+ * Backend endpoints:
+ *   - None (rendered after upstream API failure or routing validation)
+ *
+ * State & storage:
+ *   - Does not use local component state
+ *   - Relies on React Router navigation history
+ *
+ * Notes:
+ *   - Mirrors the visual style of PostNotFound for consistency
+ *   - Emoji is decorative and marked aria-hidden
+ *   - Used when user lookup returns 404/410 or equivalent
+ */
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -45,7 +68,7 @@ const UserNotFound: React.FC = () => {
           <div className="flex-grow-1">
             <h4 className="unf-title mb-1">User not found</h4>
             <p className="unf-sub mb-3">
-              We couldn’t find that user. They likely deleted their account or
+              We couldn't find that user. They likely deleted their account or
               the link leads to no existing user in the database.
             </p>
 

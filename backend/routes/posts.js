@@ -1,4 +1,15 @@
-// routes/posts.js
+/**
+ * Post/feed routes: CRUD posts, cursor-based feed pagination, and nested interactions.
+ *
+ * Supports:
+ *   - creating/updating posts with optional image uploads (multer → Cloudinary)
+ *   - listing the global feed using cursor pagination (createdAt + _id)
+ *   - per-user post lists and single post fetch
+ *   - reactions on posts, comments, and replies (likes/dislikes)
+ *   - nested comments + one-level replies, including edit/delete
+ *
+ * Uses verifyToken for authentication and tenant-bound models (req.models).
+ */
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middleware/verifyToken");
@@ -9,10 +20,10 @@ const multer = require("multer");
 const upload = multer({ dest: "tmp/" });
 const { cloudinary } = require("../lib/cloudinary");
 
-// -------- tenant model accessor --------
-const getM = (req) => req.models; // { Post, User, Notification }
+// -------- Tenant model accessor --------
+const getM = (req) => req.models;
 
-// --- cursor helpers ---
+// --- Cursor helpers ---
 const encodeCursor = (obj) =>
   Buffer.from(
     JSON.stringify({ createdAt: obj.createdAt, _id: String(obj._id) }),
@@ -47,7 +58,7 @@ router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
 
     const description = (req.body.description || "").trim();
 
-    // If client provided a full URL, accept it; otherwise, if a file was sent, upload to Cloudinary.
+    // If client provided a full URL, accept it; otherwise, if a file was sent, upload to Cloudinary
     let imageUrl = (req.body.imageUrl || "").trim() || null;
 
     if (req.file) {
@@ -63,7 +74,7 @@ router.post("/posts", verifyToken, upload.single("image"), async (req, res) => {
 
     const post = await Post.create({ user: meId, description, imageUrl });
 
-    // notify followers
+    // Notify followers
     try {
       const u = await User.findById(meId).select("followers");
       const followers = (u?.followers || [])
@@ -172,7 +183,7 @@ router.put("/posts/:id", verifyToken, upload.single("image"), async (req, res) =
     if (typeof description === "string") post.description = description;
 
     if (req.file) {
-      // remove old local-only file
+      // Remove old local-only file
       removeLocalIfUploadsPath(post.imageUrl);
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: `${process.env.CLOUDINARY_FOLDER || "social-media"}/posts`,
@@ -180,7 +191,7 @@ router.put("/posts/:id", verifyToken, upload.single("image"), async (req, res) =
       post.imageUrl = result.secure_url;
       try { fs.unlink(req.file.path, () => {}); } catch {}
     } else if (typeof req.body.imageUrl === "string" && req.body.imageUrl.trim()) {
-      // allow swapping to a new Cloudinary URL without uploading a new file
+      // Allow swapping to a new Cloudinary URL without uploading a new file
       removeLocalIfUploadsPath(post.imageUrl);
       post.imageUrl = req.body.imageUrl.trim();
     }
@@ -243,6 +254,7 @@ router.get("/users/:id/posts", async (req, res) => {
  *       POST REACTIONS
  * ======================= */
 
+// Like post
 router.post("/posts/:id/like", verifyToken, async (req, res) => {
   try {
     const { Post, Notification } = getM(req);
@@ -293,6 +305,7 @@ router.post("/posts/:id/like", verifyToken, async (req, res) => {
   }
 });
 
+// Dislike post
 router.post("/posts/:id/dislike", verifyToken, async (req, res) => {
   try {
     const { Post } = getM(req);
@@ -337,6 +350,7 @@ router.post("/posts/:id/dislike", verifyToken, async (req, res) => {
  *          COMMENTS
  * ======================= */
 
+// Post comment
 router.post("/posts/:id/comments", verifyToken, async (req, res) => {
   try {
     const { Post, Notification } = getM(req);
@@ -374,6 +388,7 @@ router.post("/posts/:id/comments", verifyToken, async (req, res) => {
   }
 });
 
+// Update comment
 router.put(
   "/posts/:postId/comments/:commentId",
   verifyToken,
@@ -417,6 +432,7 @@ router.put(
   }
 );
 
+// Delete comment
 router.delete(
   "/posts/:postId/comments/:commentId",
   verifyToken,
@@ -446,7 +462,7 @@ router.delete(
   }
 );
 
-// ---- helpers that need Post passed in (tenant-safe) ----
+// ---- Helpers that need Post passed in (tenant-safe) ----
 async function getCommentSnapshot(Post, postId, commentId) {
   const snap = await Post.findById(postId).select(
     "comments._id comments.likes comments.dislikes"
@@ -466,6 +482,7 @@ async function getCommentSnapshot(Post, postId, commentId) {
  *     COMMENT REACTIONS
  * ======================= */
 
+// Like comment
 router.post(
   "/posts/:postId/comments/:commentId/like",
   verifyToken,
@@ -531,6 +548,7 @@ router.post(
   }
 );
 
+// Dislike comment
 router.post(
   "/posts/:postId/comments/:commentId/dislike",
   verifyToken,
@@ -583,6 +601,7 @@ router.post(
  *          REPLIES
  * ======================= */
 
+// Post reply
 router.post(
   "/posts/:postId/comments/:commentId/replies",
   verifyToken,
@@ -660,7 +679,7 @@ router.post(
   }
 );
 
-// ---- helper needs Post injected ----
+// ---- Helper needs Post injected ----
 async function getReplySnapshot(Post, postId, commentId, replyId) {
   const snap = await Post.findById(postId).select(
     "comments._id comments.replies._id comments.replies.likes comments.replies.dislikes"
@@ -678,6 +697,7 @@ async function getReplySnapshot(Post, postId, commentId, replyId) {
   };
 }
 
+// Like reply
 router.post(
   "/posts/:postId/comments/:commentId/replies/:replyId/like",
   verifyToken,
@@ -752,6 +772,7 @@ router.post(
   }
 );
 
+// Dislike reply
 router.post(
   "/posts/:postId/comments/:commentId/replies/:replyId/dislike",
   verifyToken,

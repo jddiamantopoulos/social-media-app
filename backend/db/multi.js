@@ -1,4 +1,13 @@
-// db/multi.js
+/**
+ * Manages MongoDB connections for the application.
+ *
+ * Builds database-specific connection URIs from environment variables
+ * and caches active Mongoose connections to avoid reconnecting on
+ * every request.
+ *
+ * Used by middleware to retrieve the correct database connection
+ * based on the selected tenant.
+ */
 const mongoose = require("mongoose");
 
 const BASE =
@@ -7,7 +16,7 @@ if (!BASE) throw new Error("MONGODB_URI_BASE (or MONGO_URI_BASE) missing in env"
 
 const RAW_PARAMS = process.env.MONGODB_URI_PARAMS || "?retryWrites=true&w=majority";
 
-const cache = new Map(); // dbName -> Connection
+const cache = new Map();
 
 function buildUri(dbName) {
   if (!dbName) throw new Error("dbName is required");

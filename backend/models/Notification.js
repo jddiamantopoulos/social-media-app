@@ -1,4 +1,12 @@
-// models/Notification.js
+/**
+ * Notification schema for user activity alerts.
+ *
+ * Stores events such as likes, follows, comments, and replies,
+ * along with references to the relevant users and content.
+ *
+ * Designed for efficient inbox-style listing and unread
+ * notification filtering.
+ */
 const { Schema } = require("mongoose");
 
 const NotificationSchema = new Schema(
@@ -11,8 +19,8 @@ const NotificationSchema = new Schema(
       required: true,
     },
     post:    { type: Schema.Types.ObjectId, ref: "Post" },
-    comment: { type: Schema.Types.ObjectId }, // subdoc id
-    reply:   { type: Schema.Types.ObjectId }, // subdoc id
+    comment: { type: Schema.Types.ObjectId },
+    reply:   { type: Schema.Types.ObjectId },
     read:    { type: Boolean, default: false, index: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }

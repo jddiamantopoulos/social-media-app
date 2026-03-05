@@ -1,18 +1,60 @@
-// src/components/Settings.tsx
+/**
+ * Settings page component.
+ *
+ * Purpose:
+ *   - Provides authenticated users a central place to manage account settings and UI theme.
+ *
+ * Key behaviors:
+ *   - Loads and persists the UI theme (mode + primary color) via local utilities and applies it globally
+ *   - Loads the current username for editing
+ *   - Validates and updates username (with client-side constraints)
+ *   - Validates and updates password (match, length, no spaces)
+ *   - Allows the user to permanently delete their account (with confirmation)
+ *
+ * Backend endpoints:
+ *   - GET    /api/settings/me
+ *   - PUT    /api/settings/username
+ *       - JSON body:
+ *           - username (string)
+ *   - PUT    /api/settings/password
+ *       - JSON body:
+ *           - currentPassword (string)
+ *           - newPassword     (string)
+ *   - DELETE /api/settings/account
+ *
+ * State & storage:
+ *   - Reads auth state from localStorage:
+ *       - token (JWT string)
+ *       - user  (JSON-serialized user object)
+ *   - Writes updated user snapshot to localStorage after username changes
+ *   - Theme persistence:
+ *       - loadTheme(): reads saved theme (e.g., localStorage)
+ *       - saveTheme(theme): persists theme for future sessions
+ *       - applyTheme(theme): applies CSS variables / attributes globally
+ *
+ * Notes:
+ *   - Username constraints:
+ *       - 3-20 characters
+ *       - letters, numbers, "." and "_" only
+ *       - no spaces
+ *       - no leading/trailing "." or "_"
+ *       - no consecutive "." or "_" patterns per regex
+ *   - Password constraints:
+ *       - 8-64 characters
+ *       - at least one letter and one number
+ *       - no whitespace
+ *       - confirmation must match
+ */
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import {
-  applyTheme,
-  loadTheme,
-  saveTheme,
-  ThemeMode,
-  PrimaryKey,
-} from "../utils/theme";
+import { applyTheme, loadTheme, saveTheme, ThemeMode, PrimaryKey, } from "../utils/theme";
 
 const USERNAME_MIN = 3;
 const USERNAME_MAX = 20;
-// Only letters/numbers/dot/underscore; no leading/trailing dot/underscore
-const USERNAME_RE = /^(?![._])(?!.*[._]$)[A-Za-z0-9._]+$/;
+
+// Username and password requirements kept in sync with backend
+const USERNAME_RE = /^(?![_.])(?!.*[_.]{2})[A-Za-z0-9._]{3,20}(?<![_.])$/;
+const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d)(?=\S+$).{8,64}$/;
 
 const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 64;
@@ -90,13 +132,9 @@ const Settings: React.FC = () => {
   const saveUsername = async () => {
     setUsernameMsg(null);
     const trimmed = username.trim();
-    if (
-      trimmed.length < USERNAME_MIN ||
-      trimmed.length > USERNAME_MAX ||
-      !USERNAME_RE.test(trimmed)
-    ) {
+    if (!USERNAME_RE.test(trimmed)) {
       setUsernameMsg(
-        `Username must be ${USERNAME_MIN}-${USERNAME_MAX} chars; letters, numbers, . _ only, and may not start or end with . or _.`
+        `Username must be 3-20 characters, letters/numbers/._ only, no spaces, no leading/trailing . or _, and no consecutive . or _.`
       );
       return;
     }
@@ -131,14 +169,10 @@ const Settings: React.FC = () => {
       setPwMsg("New passwords do not match.");
       return;
     }
-    if (pwNew.length < PASSWORD_MIN || pwNew.length > PASSWORD_MAX) {
+    if (!PASSWORD_RE.test(pwNew)) {
       setPwMsg(
-        `New password must be ${PASSWORD_MIN}-${PASSWORD_MAX} characters.`
+        `Password must be 8-64 characters, include at least one letter and one number, and contain no spaces.`
       );
-      return;
-    }
-    if (/\s/.test(pwNew)) {
-      setPwMsg("Password cannot contain spaces.");
       return;
     }
     try {
@@ -317,7 +351,7 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Danger zone / delete account card (optional) */}
+        {/* Danger zone / delete account card */}
         <div className="card border-0 shadow-sm mt-3">
           <div className="card-body">
             <div className="placeholder-wave mb-2">
@@ -378,7 +412,7 @@ const Settings: React.FC = () => {
                       }`}
                       onClick={() => {
                         const next = { ...theme, mode: m };
-                        setTheme(next); // <- remove applyTheme(next) and saveTheme(next)
+                        setTheme(next);
                       }}
                     >
                       {m === "light" ? "Light" : "Dark"}
@@ -400,7 +434,7 @@ const Settings: React.FC = () => {
                       aria-label={`Primary ${k}`}
                       onClick={() => {
                         const next = { ...theme, primary: k };
-                        setTheme(next); // <- remove applyTheme(next) and saveTheme(next)
+                        setTheme(next);
                       }}
                       style={{
                         width: 32,
@@ -438,6 +472,11 @@ const Settings: React.FC = () => {
                   className="form-control"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === " ") {
+                      e.preventDefault();
+                    }
+                  }}
                   maxLength={USERNAME_MAX}
                 />
                 <div className="form-text">
@@ -477,6 +516,11 @@ const Settings: React.FC = () => {
                     className="form-control"
                     value={pwCurrent}
                     onChange={(e) => setPwCurrent(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === " ") {
+                        e.preventDefault();
+                      }
+                    }}
                   />
                 </div>
                 <div className="col-md-4">
@@ -489,6 +533,11 @@ const Settings: React.FC = () => {
                     className="form-control"
                     value={pwNew}
                     onChange={(e) => setPwNew(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === " ") {
+                        e.preventDefault();
+                      }
+                    }}
                   />
                   <div className="form-text">
                     {PASSWORD_MIN}-{PASSWORD_MAX} chars, no spaces, include
@@ -505,6 +554,11 @@ const Settings: React.FC = () => {
                     className="form-control"
                     value={pwConfirm}
                     onChange={(e) => setPwConfirm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === " ") {
+                        e.preventDefault();
+                      }
+                    }}
                   />
                 </div>
               </div>

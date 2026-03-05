@@ -1,30 +1,37 @@
-// routes/auth.js
+/**
+ * Authentication routes (signup + login).
+ *
+ * Supports:
+ *   - using tenant-bound Mongoose models (req.models) so accounts are created
+ *     and authenticated against the active database for the request
+ *   - validating username/password formats
+ *   - hashing passwords with bcrypt
+ *   - issuing JWTs returned to the client for subsequent authenticated requests.
+ * 
+ * Uses tenant-bound models (req.models).
+ */
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-// --- get tenant-bound models from the current request
+// Get tenant-bound models from the current request
 const getM = (req) => req.models;
 
 /** ---------- Validation helpers ---------- */
-const USERNAME_RE = /^(?![_.])(?!.*[_.]{2})[A-Za-z0-9._]{3,20}(?<![_.])$/;
-// - no leading/trailing dot/underscore
-// - no double dot/underscore
-// - only letters, numbers, dot, underscore
-// - length 3-20
 
+// Username rules: 3-20 chars, letters/numbers/._ only, no spaces, no leading/trailing ._, no double ._
+const USERNAME_RE = /^(?![_.])(?!.*[_.]{2})[A-Za-z0-9._]{3,20}(?<![_.])$/;
+
+// Password rules: 8-64 chars, at least 1 letter + 1 number, no whitespace
 const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d)(?=\S+$).{8,64}$/;
-// - at least one letter and one number
-// - no whitespace
-// - 8-64 chars
 
 function escRx(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
 function validateUsername(username) {
   const u = String(username || "").trim();
   if (!USERNAME_RE.test(u)) {
-    return "Username must be 3–20 characters, letters/numbers/._ only, no spaces, no leading/trailing . or _, and no consecutive . or _.";
+    return "Username must be 3-20 characters, letters/numbers/._ only, no spaces, no leading/trailing . or _, and no consecutive . or _.";
   }
   return null;
 }
@@ -32,10 +39,7 @@ function validateUsername(username) {
 function validatePassword(password, username) {
   const p = String(password || "");
   if (!PASSWORD_RE.test(p)) {
-    return "Password must be 8–64 characters, include at least one letter and one number, and contain no spaces.";
-  }
-  if (username && p.toLowerCase().includes(String(username).trim().toLowerCase())) {
-    return "Password cannot contain your username.";
+    return "Password must be 8-64 characters, include at least one letter and one number, and contain no spaces.";
   }
   return null;
 }
@@ -99,7 +103,7 @@ router.post("/login", async (req, res) => {
   const password = String(req.body.password || "");
 
   try {
-    // case-insensitive lookup
+    // Case-insensitive lookup
     const user = await User.findOne({
       username: { $regex: new RegExp("^" + escRx(username) + "$", "i") },
     });

@@ -1,4 +1,12 @@
-// models/byConn.js
+/**
+ * Registers and binds Mongoose schemas to a specific connection.
+ *
+ * Ensures that models are attached per-connection (rather than globally),
+ * which allows the application to support multiple databases safely.
+ *
+ * Exposes a getModels(conn) helper that returns all application models
+ * associated with the provided Mongoose connection.
+ */
 const path = require("path");
 
 // Import schemas explicitly from files in this folder
@@ -26,7 +34,7 @@ function ensureModel(conn, name, schema) {
   return conn.models[name];
 }
 
-// Register all schemas on the given mongoose connection and return the models.
+// Register all schemas on the given mongoose connection and return the models
 function getModels(conn) {
   return {
     User:         ensureModel(conn, "User",         UserSchema),

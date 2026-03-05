@@ -1,4 +1,12 @@
-// models/Conversation.js
+/**
+ * Conversation schema for 1:1 direct messages.
+ *
+ * Enforces exactly two participants and maintains a stable participantsKey
+ * (<idA>_<idB> sorted lexicographically) so the same pair of users maps to
+ * a single conversation regardless of participant order.
+ *
+ * Includes lastMessageAt for efficient inbox-style sorting.
+ */
 const { Schema } = require("mongoose");
 
 const ConversationSchema = new Schema(
@@ -10,7 +18,7 @@ const ConversationSchema = new Schema(
         message: "Conversation must have exactly 2 participants",
       },
     },
-    // e.g., "<idA>_<idB>" with ids sorted lexicographically
+    // E.g., "<idA>_<idB>" with ids sorted lexicographically
     participantsKey: { type: String, unique: true, index: true },
     lastMessageAt: { type: Date, default: null },
   },
@@ -20,7 +28,7 @@ const ConversationSchema = new Schema(
 // Build a stable key regardless of participant order
 function buildKey(list) {
   const [a, b] = (list || []).map((id) => String(id)).sort();
-  return a && b ? `${a}_${b}` : null; // underscore to match messages.js
+  return a && b ? `${a}_${b}` : null;
 }
 
 ConversationSchema.pre("save", function (next) {

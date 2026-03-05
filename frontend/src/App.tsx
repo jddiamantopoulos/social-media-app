@@ -1,4 +1,21 @@
-// src/App.tsx
+/**
+ * Application root + route configuration.
+ *
+ * Responsibilities:
+ *   - Defines all client-side routes for the SPA using React Router v6.
+ *   - Implements a "background location" pattern so /posts/:postId/comments can render
+ *     as a modal-style overlay on top of the previous page (feed/profile/post) while still
+ *     supporting direct navigation as a normal full page route.
+ *   - Wraps the app in PageStateCacheProvider to preserve per-visit UI state across navigation
+ *     (e.g., overlay drafts/expanded threads) and renders the global NavBar.
+ *
+ * Routing notes:
+ *   - When navigating to the comments route with `state.backgroundLocation`, the main <Routes>
+ *     renders against that background location and a second overlay <Routes> renders CommentsPage
+ *     in a fixed-position layer.
+ *   - If the comments route is visited directly (no backgroundLocation), it renders normally
+ *     via the base route tree.
+ */
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -23,14 +40,14 @@ import Settings from "./components/Settings";
 import MessagePage from "./components/MessagePage";
 import CommentsPage from "./components/CommentsPage";
 
-// bring in the provider
+// Bring in the provider
 import { PageStateCacheProvider } from "./hooks/pageStateCache";
 
 function AppInner() {
   const location = useLocation();
   const state = location.state as { backgroundLocation?: Location } | undefined;
 
-  // Treat ONLY the comments path as an overlay
+  // Treat only the comments path as an overlay
   const isOverlayRoute = !!matchPath(
     "/posts/:postId/comments",
     location.pathname
@@ -40,7 +57,7 @@ function AppInner() {
 
   return (
     <>
-      {/* Base app rendered against the *background* location when present */}
+      {/* Base app rendered against the background location when present */}
       <Routes location={routeLocation}>
         <Route path="/" element={<Navigate replace to="/home" />} />
         <Route
@@ -50,7 +67,7 @@ function AppInner() {
         <Route path="/about" element={<About />} />
         <Route path="/login" element={<LogIn />} />
         <Route path="/signup" element={<SignUp />} />
-        {/* Key these so they remount on same-path navigations */}
+        {/* Key allows for remounting on same-path navigations */}
         <Route
           path="/profile"
           element={<Profile key={`profile@${routeLocation.key}`} />}
@@ -65,13 +82,12 @@ function AppInner() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/messages" element={<MessagePage />} />
         <Route path="/messages/:conversationId" element={<MessagePage />} />
-        {/* include comments here too so direct hits work full-page */}
         <Route path="/posts/:postId/comments" element={<CommentsPage />} />
 
         <Route path="*" element={<Navigate replace to="/home" />} />
       </Routes>
 
-      {/* Overlay tree: render ONLY when on an overlay route and we have a background */}
+      {/* Overlay tree: render only when on an overlay route and a background is present */}
       {isOverlayRoute && bg && (
         <div
           style={{
@@ -99,7 +115,7 @@ function AppInner() {
 const App: React.FC = () => {
   return (
     <Router>
-      {/* wrap everything in the cache provider */}
+      {/* Wrap everything in the cache provider */}
       <PageStateCacheProvider>
         <NavBar />
         <div style={{ paddingTop: "56px" }}>

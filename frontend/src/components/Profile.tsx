@@ -1,4 +1,50 @@
-// src/components/Profile.tsx
+/**
+ * Profile page component.
+ *
+ * Purpose:
+ *   - Displays the authenticated user's profile (avatar, username, bio/description, counts)
+ *     and the user's own posts, with inline actions for editing profile fields and managing posts.
+ *
+ * Key behaviors:
+ *   - Loads the current user snapshot from /api/user/me and persists it to localStorage
+ *   - Shows follower/following counts and opens searchable overlays for each list
+ *   - Allows updating the profile avatar via multipart upload
+ *   - Allows editing and saving the profile description with basic constraints (no newlines, max length)
+ *   - Fetches and renders the user's posts, with reactions (like/dislike) and navigation to comments overlay
+ *   - Supports post management actions: edit (navigate) and delete (confirmed)
+ *
+ * Backend endpoints:
+ *   - GET  /api/user/me
+ *   - POST /api/user/avatar
+ *       - multipart/form-data fields:
+ *           - avatar (File) required
+ *   - PUT  /api/user/description
+ *       - JSON body:
+ *           - description (string)
+ *   - GET  /api/users/:id/posts
+ *   - POST /api/posts/:postId/like
+ *   - POST /api/posts/:postId/dislike
+ *   - POST /api/posts/:postId/comments
+ *   - DELETE /api/posts/:postId
+ *   - GET  /api/users/:id/followers
+ *   - GET  /api/users/:id/following
+ *
+ * State & storage:
+ *   - Reads JWT + user snapshot from localStorage:
+ *       - token (JWT string)
+ *       - user  (JSON-serialized user object)
+ *   - Writes updated user snapshot back to localStorage after profile edits
+ *   - Local component state:
+ *       - me, photoUrl, description, editingDesc/editDesc
+ *       - posts, loading
+ *       - follower/following overlay state + lists
+ *
+ * Notes:
+ *   - Avatar uploads do NOT set Content-Type manually; axios will set boundary for FormData
+ *   - Uses an Object URL for instant avatar preview and revokes it to avoid memory leaks
+ *   - Description input blocks Enter to keep a single-line style description
+ *   - UI is theme-aware via Bootstrap CSS variables
+ */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -62,15 +108,14 @@ const Profile: React.FC = () => {
   const [description, setDescription] = useState(me.description || "");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [overlayPostId, setOverlayPostId] = useState<string | null>(null);
 
-  // followers/following overlays
+  // Followers/following overlays
   const [showFollowers, setShowFollowers] = useState(false);
   const [showFollowing, setShowFollowing] = useState(false);
   const [followersList, setFollowersList] = useState<SimpleUser[]>([]);
   const [followingList, setFollowingList] = useState<SimpleUser[]>([]);
 
-  // unified description editing state
+  // Unified description editing state
   const [editingDesc, setEditingDesc] = useState(false);
   const [editDesc, setEditDesc] = useState(description ?? "");
 
@@ -79,8 +124,10 @@ const Profile: React.FC = () => {
   const baseBg = (location.state as any)?.backgroundLocation || location;
   const refreshIfSame: React.MouseEventHandler<HTMLAnchorElement> = (e) => {
     if (location.pathname === "/profile") {
-      e.preventDefault(); // don’t re-push /profile
-      navigate(0); // React Router v6 hard refresh
+      // Don't re-push /profile
+      e.preventDefault();
+      // React Router v6 hard refresh
+      navigate(0);
     }
   };
 
@@ -92,7 +139,8 @@ const Profile: React.FC = () => {
   const onDescKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (
     e
   ) => {
-    if (e.key === "Enter") e.preventDefault(); // block newlines entirely
+    // Block newlines entirely
+    if (e.key === "Enter") e.preventDefault();
   };
 
   const styles = `
@@ -148,12 +196,17 @@ const Profile: React.FC = () => {
     width: 128px; height: 128px;
     object-fit: cover;
     border-radius: 50%;
-    border: 3px solid var(--bs-card-bg); /* ring matches card */
+    /* Ring matches card */
+    border: 3px solid var(--bs-card-bg);
     box-shadow:
-      0 0 0 3px var(--bs-card-bg),          /* crisp ring */
-      0 0 18px 6px var(--ring-underlay),    /* radial glow */
-      0 10px 22px -6px var(--ring-underlay),/* soft spread */
-      0 12px 28px rgba(0,0,0,.35);          /* depth */
+      /* Crisp ring */
+      0 0 0 3px var(--bs-card-bg),
+      /* Radial glow */
+      0 0 18px 6px var(--ring-underlay),
+      /* Soft spread */
+      0 10px 22px -6px var(--ring-underlay),
+      /* Depth */
+      0 12px 28px rgba(0,0,0,.35);
   }
   .avatar-camera {
     position: absolute;
@@ -273,16 +326,6 @@ const Profile: React.FC = () => {
     fetchPosts();
   };
 
-  const postComment = async (postId: string, text: string) => {
-    if (!text.trim()) return;
-    await axios.post(
-      `/api/posts/${postId}/comments`,
-      { text },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    fetchPosts();
-  };
-
   const deletePost = async (postId: string) => {
     if (!window.confirm("Delete this post? This cannot be undone.")) return;
     try {
@@ -302,34 +345,34 @@ const Profile: React.FC = () => {
     const f = e.target.files?.[0];
     if (!f) return;
 
-    // instant preview while uploading (optional)
+    // Instant preview while uploading
     const tempUrl = URL.createObjectURL(f);
     setPhotoUrl(tempUrl);
 
     try {
       const form = new FormData();
-      form.append("avatar", f); // <-- must match multer field name on backend
+      form.append("avatar", f);
 
       const { data } = await axios.post("/api/user/avatar", form, {
-        headers: { Authorization: `Bearer ${token}` }, // DON'T set Content-Type manually
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      // cache-bust helper so the browser fetches the fresh image
+      // Cache-bust helper so the browser fetches the fresh image
       const freshUrl = `${data.photoUrl}${
         String(data.photoUrl).includes("?") ? "&" : "?"
       }cv=${Date.now()}`;
 
-      // update header avatar immediately
+      // Update header avatar immediately
       setPhotoUrl(freshUrl);
 
-      // update local user + localStorage
+      // Update local user + localStorage
       setMe(prev => {
         const next = { ...prev, photoUrl: freshUrl };
         localStorage.setItem("user", JSON.stringify(next));
         return next;
       });
 
-      // update any posts currently in view that show my avatar
+      // Update any posts currently in view that show my avatar
       setPosts(prev => prev.map(p => ({
         ...p,
         user: p.user._id === me.id ? { ...p.user, photoUrl: freshUrl } : p.user
@@ -338,7 +381,7 @@ const Profile: React.FC = () => {
       console.error("Avatar update error:", err);
       alert("Failed to update avatar. Please try again.");
     } finally {
-      // allow re-selecting same file later
+      // Allow re-selecting same file later
       if (fileRef.current) fileRef.current.value = "";
       URL.revokeObjectURL(tempUrl);
     }
@@ -358,7 +401,7 @@ const Profile: React.FC = () => {
     setEditingDesc(false);
   };
 
-  // lists
+  // Lists
   const openFollowers = async () => {
     const { data } = await axios.get<SimpleUser[]>(
       `/api/users/${me.id}/followers`
@@ -448,10 +491,7 @@ const Profile: React.FC = () => {
   );
 
   // --- Empty state card ---
-  const EmptyFeed: React.FC<{ loggedIn: boolean; onCreate: () => void }> = ({
-    loggedIn,
-    onCreate,
-  }) => (
+  const EmptyFeed: React.FC<{ loggedIn: boolean; onCreate: () => void }> = ({}) => (
     <div className="text-center py-5">
       <div className="display-6 mb-2" aria-hidden>
         📭
@@ -672,7 +712,7 @@ const Profile: React.FC = () => {
     <div className="container" style={{ paddingTop: "56px" }}>
       <style>{styles}</style>
 
-      {/* PROFILE HEADER */}
+      {/* Profile header */}
       <div className="profile-card">
         <div className="d-flex align-items-center" style={{ gap: 20 }}>
           {/* Avatar + camera button */}
@@ -793,7 +833,7 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* POSTS */}
+      {/* Posts */}
       <h3 className="mb-3">Your Posts</h3>
       {loading ? (
         <FeedLoading cards={3} />
@@ -935,7 +975,7 @@ const Profile: React.FC = () => {
         })
       )}
 
-      {/* overlays */}
+      {/* Overlays */}
       {showFollowers && (
         <ListOverlay
           title="Followers"

@@ -1,4 +1,22 @@
-// src/components/About.tsx
+/**
+ * About page component.
+ *
+ * Purpose:
+ *   - Presents a short introduction to the app and its creator, and sets the browser tab title.
+ *
+ * Key behaviors:
+ *   - Updates document.title on mount
+ *   - Renders a responsive circular profile image with a graceful fallback if missing
+ *
+ * Backend endpoints:
+ *   - None
+ *
+ * State & storage:
+ *   - None (static content)
+ *
+ * Notes:
+ *   - Uses inline styles for responsive sizing (clamp + aspectRatio) and image framing/zoom.
+ */
 import React, { useEffect } from "react";
 
 const About: React.FC = () => {
@@ -12,7 +30,7 @@ const About: React.FC = () => {
       <div className="text-center mb-4">
         <div
           style={{
-            // responsive circle: between 160px and 320px, scales with viewport
+            // Responsive circle: between 160px and 320px, scales with viewport
             width: "clamp(160px, 28vw, 320px)",
             aspectRatio: "1 / 1",
             margin: "0 auto",
@@ -27,14 +45,14 @@ const About: React.FC = () => {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover", // fills the circle nicely
-              objectPosition: "50% 50%", // center subject
-              transform: "scale(2)", // zoom in
-              transformOrigin: "55% 40%", // keep zoom centered
+              objectFit: "cover",
+              objectPosition: "50% 50%",
+              transform: "scale(2)",
+              transformOrigin: "55% 40%",
               display: "block",
             }}
             onError={(e) => {
-              // graceful fallback if the image is missing
+              // Graceful fallback if the image is missing
               (e.currentTarget as HTMLImageElement).style.display = "none";
             }}
           />
@@ -44,27 +62,31 @@ const About: React.FC = () => {
       <div className="row justify-content-center">
         <div className="col-lg-8">
           <h1 className="display-5 fw-bold text-center mb-3">
-            About CyberScape and its creator
+            About CyberScape and Its Creator
           </h1>
           <p className="lead">
-            Hi, I am Jonathan Diamantopoulos! As a junior pursuing a degree in
-            Computer Science at ASU Barrett, The Honors College, I wanted to
-            test the limits of artificial intelligence in web development while
-            incorporating some of my own programming knowledge.
+            Hello! I'm Jonathan Diamantopoulos, a junior Computer Science student at
+            ASU's Barrett, The Honors College. I designed and built CyberScape to gain
+            hands-on experience developing a full-stack web application from concept
+            to deployment.
           </p>
           <p className="lead">
-            CyberScape is a lightweight social media platform built with React,
-            MongoDB, and multiple web development modules and libraries using
-            ChatGPT. It involves backend programming via JavaScript files and
-            frontend programming via TypeScript + JavaScript XML (TSX) files.
-            To deploy the project, I used Render for the backend and Vercel for the
-            frontend. Additionally, the web app showcases multiple features of a standard
-            social media app, including accounts, posting, followers, likes/dislikes,
-            search, comments, replies, settings, messages, notifications, editing,
-            deleting, and real-time-ish sync via polling.
+            CyberScape is a lightweight social media platform built with React, Node.js,
+            and MongoDB, using technologies such as Express, Mongoose, and Axios.
+            The frontend is developed with TypeScript and React (TSX), while the backend
+            is implemented in JavaScript. The application is deployed using Vercel
+            (frontend) and Render (backend).
           </p>
           <p className="lead">
-            I hope you enjoy playing around with the software!
+            The platform supports core social media functionality including user
+            accounts, posts, followers, likes and dislikes, search, comments and
+            replies, private messaging, notifications, profile settings, and content
+            editing and deletion. It also provides near real-time updates using
+            periodic data polling.
+          </p>
+          <p className="lead">
+            Thank you for checking out CyberScape — I hope you enjoy exploring the
+            platform!
           </p>
         </div>
       </div>

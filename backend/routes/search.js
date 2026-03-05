@@ -1,11 +1,20 @@
-// routes/search.js
+/**
+ * Unified search route for users and posts.
+ *
+ * Supports:
+ *   - performing a case-insensitive regex match against usernames and post descriptions
+ *   - ranking combined results using lightweight scoring (exact/prefix/contains, recency boost, and like-count signal)
+ *
+ * Uses tenant-bound models (req.models) and caps query length to prevent
+ * expensive/pathological regex patterns.
+ */
 const express = require("express");
 const router = express.Router();
 
-// simple escape for building a safe regex
+// Simple escape for building a safe regex
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// ----- tiny scorers -----
+// ----- Tiny scorers -----
 function scoreUser(u, q) {
   const s = q.toLowerCase();
   const name = (u.username || "").toLowerCase();
@@ -24,11 +33,11 @@ function scorePost(p, q) {
   if (desc.startsWith(s)) score += 80;
   else if (desc.includes(s)) score += 60;
 
-  // recency boost (gentle decay)
+  // Recency boost (gentle decay)
   const ageH = (Date.now() - new Date(p.createdAt).getTime()) / 36e5;
   score += Math.max(0, 40 - Math.log10(1 + ageH) * 25);
 
-  // popularity
+  // Popularity
   const likes = Array.isArray(p.likes) ? p.likes.length : 0;
   score += Math.min(40, likes * 2);
 
@@ -37,18 +46,19 @@ function scorePost(p, q) {
 
 router.get("/search", async (req, res) => {
   try {
-    // get tenant-bound models per request
+    // Get tenant-bound models per request
     const { User, Post } = req.models;
 
-    // sanitize inputs
+    // Sanitize inputs
     const raw = String(req.query.q || "").trim();
-    const q = raw.slice(0, 80); // hard cap to avoid pathological regex
+    // Hard cap to avoid pathological regex
+    const q = raw.slice(0, 80);
     const limit = Math.max(1, Math.min(20, Number(req.query.limit) || 8));
     if (!q) return res.json({ results: [] });
 
     const rx = new RegExp(esc(q.replace(/^@/, "")), "i");
 
-    // fetch a few of each (lean + projections)
+    // Fetch a few of each (lean + projections)
     const [users, posts] = await Promise.all([
       User.find({ username: rx })
         .select({ username: 1, photoUrl: 1 })

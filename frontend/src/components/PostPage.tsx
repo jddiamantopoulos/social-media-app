@@ -1,4 +1,33 @@
-// src/components/PostPage.tsx
+/**
+ * Create post page component.
+ *
+ * Purpose:
+ *   - Allows an authenticated user to create a new feed post consisting of an image
+ *     and a short, single-line description (caption).
+ *
+ * Key behaviors:
+ *   - Accepts an image file input and renders a client-side preview (Object URL)
+ *   - Enforces description constraints (required, max length) and blocks newlines
+ *   - Submits the post as multipart/form-data (image + description) to the backend
+ *   - Displays validation / server errors and navigates back to /home on success
+ *
+ * Backend endpoints:
+ *   - POST /api/posts
+ *       - multipart/form-data fields:
+ *           - image        (File)  required
+ *           - description  (Text)  required
+ *
+ * State & storage:
+ *   - Reads JWT from localStorage:
+ *       - token (JWT string)
+ *   - Local component state:
+ *       - imageFile, previewUrl, description, error, submitting
+ *
+ * Notes:
+ *   - Uses URL.createObjectURL for preview and revokes URLs to avoid memory leaks
+ *   - Description input prevents newline insertion (Enter) and strips pasted newlines
+ *   - Styling uses Bootstrap theme variables for dark/light mode compatibility
+ */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -42,7 +71,7 @@ const PostPage: React.FC = () => {
 
   const openPicker = () => {
     if (fileInputRef.current) {
-      // allow reselecting the same file
+      // Allow reselecting the same file
       fileInputRef.current.value = "";
       fileInputRef.current.click();
     }
@@ -60,7 +89,7 @@ const PostPage: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // --- no-newlines handlers for description ---
+  // --- No-newlines handlers for description ---
   const onDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     let val = stripNewlines(e.target.value);
     if (val.length > MAX_DESC_LEN) val = val.slice(0, MAX_DESC_LEN);
@@ -71,7 +100,8 @@ const PostPage: React.FC = () => {
     e
   ) => {
     if (e.key === "Enter") {
-      e.preventDefault(); // block newline insert
+      // Block newline insert
+      e.preventDefault();
     }
   };
 
@@ -89,7 +119,7 @@ const PostPage: React.FC = () => {
     ).slice(0, MAX_DESC_LEN);
 
     setDescription(next);
-    // place caret after inserted text
+    // Place caret after inserted text
     requestAnimationFrame(() => {
       const pos = start + pasted.length;
       target.setSelectionRange(pos, pos);
@@ -118,7 +148,8 @@ const PostPage: React.FC = () => {
     }
 
     const formData = new FormData();
-    formData.append("image", imageFile); // <-- field name must match backend
+    // Field name must match backend
+    formData.append("image", imageFile);
     formData.append("description", cleanDesc);
 
     try {
@@ -138,10 +169,6 @@ const PostPage: React.FC = () => {
       setSubmitting(false);
     }
   };
-  
-  const ABS_API = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
-  const imgSrc = (u?: string) =>
-    !u ? "" : /^https?:\/\//i.test(u) ? u : `${ABS_API}${u.startsWith("/") ? u : `/${u}`}`;
 
   return (
     <div className="container" style={{ paddingTop: 56 }}>
@@ -157,14 +184,13 @@ const PostPage: React.FC = () => {
           box-shadow: var(--elev-card);
         }
 
-        /* Header uses the card cap color + themed divider */
+        /* Header uses card cap color + themed divider */
         .post-header {
           padding: 16px 20px;
           background: var(--bs-card-cap-bg);
           border-bottom: 1px solid var(--bs-border-color);
         }
 
-        /* Layout stays the same */
         .post-body {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -175,9 +201,9 @@ const PostPage: React.FC = () => {
           .post-body { grid-template-columns: 1fr; }
         }
 
-        /* Subtle surface for the image drop area (dark/light aware) */
+        /* Subtle surface for image drop area (dark/light aware) */
         :root {
-          /* derive soft panels from your theme vars */
+          /* Derive soft panels from theme vars */
           --image-panel-bg: color-mix(in srgb, var(--bs-card-bg) 94%, var(--bs-body-color) 6%);
           --image-panel-bg-hover: color-mix(in srgb, var(--bs-card-bg) 90%, var(--bs-body-color) 10%);
         }
@@ -207,7 +233,7 @@ const PostPage: React.FC = () => {
           object-fit: cover;
         }
 
-        /* Muted tokens become theme-aware */
+        /* Theme-aware muted tokens */
         .placeholder-emoji {
           font-size: 56px;
           line-height: 1;
@@ -228,7 +254,7 @@ const PostPage: React.FC = () => {
           text-overflow: ellipsis;
         }
 
-        /* Keep danger link red; everything else already themed */
+        /* Danger link red regardless of theme */
         .link-plain {
           background: none;
           border: none;
@@ -240,7 +266,7 @@ const PostPage: React.FC = () => {
           cursor: pointer;
         }
 
-        /* Textarea styling comes from global theme overrides; just size */
+        /* Textarea styling comes from global theme overrides (except size) */
         .desc-area {
           resize: none;
           min-height: 220px;
@@ -305,7 +331,7 @@ const PostPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Text UNDER the big picture */}
+              {/* Text under the big picture */}
               {!imageFile ? (
                 <div className="image-caption">
                   <small className="text-muted">

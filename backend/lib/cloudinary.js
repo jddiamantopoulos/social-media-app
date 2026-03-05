@@ -1,4 +1,10 @@
-// lib/cloudinary.js
+/**
+ * Initializes and exports a configured Cloudinary client.
+ *
+ * Reads credentials from environment variables and provides
+ * a shared instance for handling image uploads and asset
+ * management across the application.
+ */
 const { v2: cloudinary } = require("cloudinary");
 
 cloudinary.config({

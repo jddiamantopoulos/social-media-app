@@ -1,4 +1,15 @@
-// routes/messages.js
+/**
+ * Messaging routes for 1:1 direct messages.
+ *
+ * Supports:
+ *   - creating-or-getting a conversation between two users
+ *   - listing conversations with latest message + unread counts (inbox view)
+ *   - fetching messages in a conversation (participant-only)
+ *   - marking messages as read
+ *   - sending messages and updating conversation lastMessageAt
+ *
+ * Uses verifyToken for authentication and tenant-bound models (req.models).
+ */
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
@@ -6,16 +17,16 @@ const verifyToken = require("../middleware/verifyToken");
 
 const MAX_LEN = 2200;
 
-// tenant-bound models accessor
+// Tenant-bound models accessor
 const getM = (req) => req.models;
 
-/** Build a stable, unique key for a 2-party conversation. */
+/** Build a stable, unique key for a 2-party conversation */
 function buildParticipantsKey(a, b) {
   const [x, y] = [String(a).trim(), String(b).trim()].sort();
   return `${x}_${y}`;
 }
 
-/** Create-or-get conversation. */
+/** Create-or-get conversation */
 router.post("/messages/start", verifyToken, async (req, res) => {
   try {
     const { Conversation } = getM(req);
@@ -44,8 +55,7 @@ router.post("/messages/start", verifyToken, async (req, res) => {
           participants: [meId, otherId].sort((a, b) =>
             a.toString().localeCompare(b.toString())
           ),
-          participantsKey, // unique index in schema
-          // lastMessageAt becomes non-null on first message
+          participantsKey,
         },
       },
       { new: true, upsert: true }
@@ -58,7 +68,7 @@ router.post("/messages/start", verifyToken, async (req, res) => {
   }
 });
 
-/** Total unread for current user (for navbar badge). */
+/** Total unread for current user (for navbar badge) */
 router.get("/messages/unread-count", verifyToken, async (req, res) => {
   try {
     const { Message } = getM(req);
@@ -68,7 +78,7 @@ router.get("/messages/unread-count", verifyToken, async (req, res) => {
       {
         $match: {
           recipient: meId,
-          readBy: { $nin: [meId] }, // array does not contain me
+          readBy: { $nin: [meId] },
         },
       },
       { $count: "count" },
@@ -82,7 +92,7 @@ router.get("/messages/unread-count", verifyToken, async (req, res) => {
   }
 });
 
-/** List my conversations (only those with at least one message). Includes unreadCount per convo. */
+/** List my conversations (only those with at least one message); includes unreadCount per convo */
 router.get("/messages/conversations", verifyToken, async (req, res) => {
   try {
     const { Conversation, Message, User } = getM(req);
@@ -91,8 +101,8 @@ router.get("/messages/conversations", verifyToken, async (req, res) => {
     const meId = new mongoose.Types.ObjectId(me);
 
     const convos = await Conversation.find({
-      participants: meId,                 // cast to ObjectId
-      lastMessageAt: { $ne: null },       // only convos with first message sent
+      participants: meId,
+      lastMessageAt: { $ne: null },
     })
       .sort({ lastMessageAt: -1 })
       .limit(100)
@@ -179,7 +189,7 @@ router.get("/messages/conversations", verifyToken, async (req, res) => {
   }
 });
 
-/** Fetch messages (no auto-read here; the client calls /read separately). */
+/** Fetch messages (no auto-read here; the client calls /read separately) */
 router.get("/messages/:conversationId", verifyToken, async (req, res) => {
   try {
     const { Conversation, Message } = getM(req);
@@ -212,7 +222,7 @@ router.get("/messages/:conversationId", verifyToken, async (req, res) => {
   }
 });
 
-/** Mark all inbound messages in this convo as read for me. */
+/** Mark all inbound messages in this convo as read for me */
 router.post("/messages/:conversationId/read", verifyToken, async (req, res) => {
   try {
     const { Conversation, Message } = getM(req);
@@ -246,7 +256,7 @@ router.post("/messages/:conversationId/read", verifyToken, async (req, res) => {
   }
 });
 
-/** Send message + stamp lastMessageAt. */
+/** Send message + stamp lastMessageAt */
 router.post("/messages/:conversationId", verifyToken, async (req, res) => {
   try {
     const { Conversation, Message } = getM(req);

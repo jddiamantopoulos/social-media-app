@@ -1,4 +1,26 @@
-// src/components/EditPostPage.tsx
+/**
+ * Edit post page component.
+ *
+ * Purpose:
+ *   - Allows the post owner to update a post's description and optionally replace the post image.
+ *
+ * Key behaviors:
+ *   - Loads the post on mount and verifies ownership; redirects to the public post page if unauthorized/deleted
+ *   - Enforces a single-line description by stripping/blocking newlines (typing + paste)
+ *   - Shows current image and previews a newly selected replacement image via an object URL
+ *   - Submits updates as multipart/form-data to support optional file upload
+ *
+ * Backend endpoints:
+ *   - GET /api/posts/:id
+ *   - PUT /api/posts/:id   (multipart/form-data: description + optional image)
+ *
+ * State & storage:
+ *   - Reads auth token + user id from localStorage
+ *
+ * Notes:
+ *   - Resets the file input selection so picking the same file twice still triggers onChange.
+ *   - Normalizes image URLs using VITE_API_URL for relative backend paths.
+ */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
@@ -19,7 +41,7 @@ const EditPostPage: React.FC = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token") || "";
 
-  // who am I?
+  // Current user
   const me = useMemo(
     () => JSON.parse(localStorage.getItem("user") || "{}") as { id?: string },
     []
@@ -31,7 +53,7 @@ const EditPostPage: React.FC = () => {
   const [description, setDescription] = useState("");
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
 
-  const [imageFile, setImageFile] = useState<File | null>(null); // replacement (optional)
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -45,7 +67,7 @@ const EditPostPage: React.FC = () => {
       try {
         const { data } = await axios.get(`/api/posts/${id}`);
 
-        // who owns this post?
+        // Post owner
         const ownerId = String(
           data.ownerId ??
             data.userId ??
@@ -59,7 +81,7 @@ const EditPostPage: React.FC = () => {
         );
         const myId = JSON.parse(localStorage.getItem("user") || "{}").id || "";
 
-        // if not mine (or deleted), bounce to the public post page
+        // If not mine (or deleted), bounce to the public post page
         if (isDeleted || ownerId !== myId) {
           navigate(`/posts/${id}`, { replace: true });
           return;
@@ -70,13 +92,13 @@ const EditPostPage: React.FC = () => {
         setCurrentImageUrl(data?.imageUrl || null);
         setLoading(false);
       } catch (err: any) {
-        // 404/410 = gone, 403 = not allowed → show the post page (or its Not Found UI)
+        // 404/410 = gone, 403 = not allowed & show the post page (or its Not Found UI)
         const code = err?.response?.status;
         if (code === 404 || code === 410 || code === 403) {
           navigate(`/posts/${id}`, { replace: true });
           return;
         }
-        // fallback: still send them to the post page
+        // Fallback: still send them to the post page
         navigate(`/posts/${id}`, { replace: true });
       }
     })();
@@ -103,7 +125,7 @@ const EditPostPage: React.FC = () => {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    // reset first so picking the same file works
+    // Reset first so picking the same file works
     setImageFile(null);
     setTimeout(() => setImageFile(f), 0);
     setError("");
@@ -125,7 +147,7 @@ const EditPostPage: React.FC = () => {
     e
   ) => {
     if (e.key === "Enter") {
-      e.preventDefault(); // block newline insert
+      e.preventDefault(); // Block newline insert
     }
   };
 
@@ -143,15 +165,14 @@ const EditPostPage: React.FC = () => {
     ).slice(0, MAX_DESC_LEN);
 
     setDescription(next);
-    // place caret after inserted text
+    // Place caret after inserted text
     requestAnimationFrame(() => {
       const pos = start + pasted.length;
       target.setSelectionRange(pos, pos);
     });
   };
 
-  // For editing: allow submitting with or without replacing image,
-  // but require a non-empty, within-limit description.
+  // For editing: allow submitting with or without replacing image, but require a non-empty, within-limit description
   const canSubmit = useMemo(
     () => descLen > 0 && descLen <= MAX_DESC_LEN && !submitting,
     [descLen, submitting]
@@ -239,7 +260,7 @@ const EditPostPage: React.FC = () => {
 
         /* Subtle surface for the image drop area (dark/light aware) */
         :root {
-          /* derive soft panels from your theme vars */
+          /* Derive soft panels from theme vars */
           --image-panel-bg: color-mix(in srgb, var(--bs-card-bg) 94%, var(--bs-body-color) 6%);
           --image-panel-bg-hover: color-mix(in srgb, var(--bs-card-bg) 90%, var(--bs-body-color) 10%);
         }
@@ -290,7 +311,7 @@ const EditPostPage: React.FC = () => {
           text-overflow: ellipsis;
         }
 
-        /* Keep danger link red; everything else already themed */
+        /* Keep danger link red */
         .link-plain {
           background: none;
           border: none;
@@ -302,7 +323,7 @@ const EditPostPage: React.FC = () => {
           cursor: pointer;
         }
 
-        /* Textarea styling comes from global theme overrides; just size */
+        /* Textarea styling comes from global theme overrides */
         .desc-area {
           resize: none;
           min-height: 220px;
@@ -332,7 +353,7 @@ const EditPostPage: React.FC = () => {
           <div className="post-body">
             {/* Image side */}
             <div>
-              {/* hidden input */}
+              {/* Hidden input */}
               <input
                 ref={fileInputRef}
                 id="image-upload"
@@ -367,7 +388,7 @@ const EditPostPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Text UNDER the big picture */}
+              {/* Text under the big picture */}
               {!effectivePreview ? (
                 <div className="image-caption">
                   <small className="text-muted">

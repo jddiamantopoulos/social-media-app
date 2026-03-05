@@ -1,4 +1,14 @@
-// routes/settings.js
+/**
+ * Account settings routes for the authenticated user.
+ *
+ * Supports:
+ *   - fetching current profile settings (username + avatar)
+ *   - updating password and username with validation + uniqueness checks
+ *   - deleting an account and cleaning up related data (posts, reactions,
+ *     comments/replies, follower graph, and notifications)
+ *
+ * Uses verifyToken for authentication and tenant-bound models (req.models).
+ */
 const express = require("express");
 const bcrypt = require("bcrypt");
 const fs = require("fs");
@@ -6,7 +16,7 @@ const path = require("path");
 const router = express.Router();
 const verifyToken = require("../middleware/verifyToken");
 
-// ---- validation (kept consistent with auth) ----
+// ---- Validation consistent with auth ----
 const USERNAME_MIN = 3;
 const USERNAME_MAX = 20;
 const USERNAME_RE = /^(?![._])(?!.*[._]$)[A-Za-z0-9._]+$/;

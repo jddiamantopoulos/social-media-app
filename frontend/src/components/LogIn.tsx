@@ -1,4 +1,25 @@
-// src/components/LogIn.tsx
+/**
+ * Login page component.
+ *
+ * Purpose:
+ *   - Authenticates a user via username/password and establishes a local session for the SPA.
+ *
+ * Key behaviors:
+ *   - Submits credentials to the backend login endpoint
+ *   - Stores the returned JWT and user snapshot in localStorage
+ *   - Redirects to /home on success and displays an error message on failure
+ *
+ * Backend endpoints:
+ *   - POST /api/login
+ *
+ * State & storage:
+ *   - Persists auth state in localStorage:
+ *       - token (JWT string)
+ *       - user  (JSON-serialized user object)
+ *
+ * Notes:
+ *   - Uses basic HTML constraints (maxLength/required/autocomplete) for improved UX.
+ */
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +33,6 @@ const LogIn: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // correct endpoint: /api/login (not /api/auth/login)
       const res = await axios.post("/api/login", {
         username,
         password,
@@ -49,6 +69,11 @@ const LogIn: React.FC = () => {
             value={username}
             maxLength={20}
             onChange={(e) => setUsername(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === " ") {
+                e.preventDefault();
+              }
+            }}
             required
             autoComplete="username"
           />
@@ -66,6 +91,11 @@ const LogIn: React.FC = () => {
             value={password}
             maxLength={64}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === " ") {
+                e.preventDefault();
+              }
+            }}
             required
             autoComplete="current-password"
           />

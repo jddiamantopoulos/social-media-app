@@ -1,4 +1,44 @@
-// src/components/UserProfile.tsx
+/**
+ * Public user profile page.
+ *
+ * Purpose:
+ *   - Displays another user's public profile (avatar, username, bio, follower/following counts)
+ *     and a feed of that user's posts.
+ *
+ * Key behaviors:
+ *   - Fetches the target user record via the route param (:id) and renders a loading skeleton while waiting
+ *   - Fetches and renders the target user's posts list
+ *   - Supports follow/unfollow (authenticated users only) and updates follower count in-place
+ *   - Computes "following" state by checking whether the current user appears in the target user's followers list
+ *   - Allows authenticated users to react (like/dislike) to posts; redirects to /login if not authenticated
+ *   - Opens the post comments overlay/page with backgroundLocation preserved for modal-like navigation
+ *   - Shows follower/following list overlays with search + alphabetical sorting
+ *   - Starts a direct message conversation with the profile owner and navigates to the conversation thread
+ *   - Falls back to <UserNotFound /> when the user does not exist (e.g., deleted account / invalid id)
+ *
+ * Backend endpoints:
+ *   - GET    /api/users/:id
+ *   - GET    /api/users/:id/posts
+ *   - POST   /api/users/:id/follow
+ *   - GET    /api/users/:id/followers
+ *   - GET    /api/users/:id/following
+ *   - POST   /api/posts/:postId/like
+ *   - POST   /api/posts/:postId/dislike
+ *   - POST   /api/posts/:postId/comments
+ *   - POST   /api/messages/start
+ *
+ * State & storage:
+ *   - Reads auth token and current user snapshot from localStorage (token, user.id)
+ *   - Local component state:
+ *       - profileUser, posts, loading flags (loadingUser/loadingPosts)
+ *       - follow state (isFollowing) + follower/following overlays and their lists
+ *   - Uses React Router location state to preserve the background page when opening comments/messages
+ *
+ * Notes:
+ *   - Avatar URLs are normalized via VITE_API_URL for relative "/uploads/…" paths; absolute URLs pass through.
+ *   - Follow state is derived from the followers list, which is simple but can be expensive for large accounts.
+ *   - Reactions refetch the user's posts list after posting to keep counts consistent with the backend.
+ */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -65,7 +105,7 @@ const UserProfile: React.FC = () => {
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [overlayPostId, setOverlayPostId] = useState<string | null>(null);
 
-  // follow state + lists
+  // Follow state + lists
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [showFollowers, setShowFollowers] = useState(false);
   const [showFollowing, setShowFollowing] = useState(false);
@@ -78,12 +118,14 @@ const UserProfile: React.FC = () => {
     (path: string): React.MouseEventHandler<HTMLAnchorElement> =>
     (e) => {
       if (location.pathname === path) {
-        e.preventDefault(); // don't push the same route again
-        navigate(0); // React Router v6 hard refresh
+        // Don't push same route again
+        e.preventDefault();
+        // React Router v6 hard refresh
+        navigate(0);
       }
     };
 
-  // visual styles to match Profile
+  // Visual styles to match Profile
   const styles = `
   .hero-card {
     max-width: 820px;
@@ -102,11 +144,14 @@ const UserProfile: React.FC = () => {
     height: 120px;
     object-fit: cover;
     border-radius: 50%;
-    /* no solid border; ring + glow via shadows */
+    /* No solid border; ring + glow via shadows */
     box-shadow:
-      0 0 0 3px var(--bs-card-bg),          /* ring same as card background */
-      0 10px 22px -6px var(--ring-underlay),/* soft halo */
-      0 12px 28px rgba(0,0,0,.35);          /* drop shadow */
+      /* Ring same as card background */
+      0 0 0 3px var(--bs-card-bg),
+      /* Soft halo */
+      0 10px 22px -6px var(--ring-underlay),
+      /* Drop shadow */
+      0 12px 28px rgba(0,0,0,.35);
   }
   .desc {
     max-width: 680px;
@@ -117,7 +162,7 @@ const UserProfile: React.FC = () => {
     word-break: break-word;
   }
 
-  /* stats row */
+  /* Stats row */
   .stats {
     display: flex;
     justify-content: center;
@@ -148,7 +193,7 @@ const UserProfile: React.FC = () => {
   }
   .link-quiet:hover { text-decoration: underline; }
 
-  /* reaction buttons (emoji only) */
+  /* Reaction buttons (emoji only) */
   .reaction {
     background: none;
     border: 0;
@@ -167,7 +212,7 @@ const UserProfile: React.FC = () => {
   .reaction.comment:hover { color: #0d6efd; }
   .reaction:focus { outline: 2px solid #0d6efd33; outline-offset: 2px; border-radius: .375rem; }
 
-  /* post body text should wrap nicely */
+  /* Post body text should wrap nicely */
   .post-text {
     white-space: normal;
     overflow-wrap: anywhere;
@@ -194,7 +239,7 @@ const UserProfile: React.FC = () => {
   }
   `;
 
-  // fetch profile info
+  // Fetch profile info
   useEffect(() => {
     setLoadingUser(true);
     axios
@@ -204,7 +249,7 @@ const UserProfile: React.FC = () => {
       .finally(() => setLoadingUser(false));
   }, [id]);
 
-  // fetch posts
+  // Fetch posts
   useEffect(() => {
     setLoadingPosts(true);
     axios
@@ -214,7 +259,7 @@ const UserProfile: React.FC = () => {
       .finally(() => setLoadingPosts(false));
   }, [id]);
 
-  // compute following
+  // Compute following
   useEffect(() => {
     (async () => {
       if (!isLoggedIn || !id || !me.id) {
@@ -241,18 +286,6 @@ const UserProfile: React.FC = () => {
     await axios.post(`/api/posts/${postId}/${type}`, null, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const res = await axios.get<Post[]>(`/api/users/${id}/posts`);
-    setPosts(res.data);
-  };
-
-  const postComment = async (postId: string, text: string) => {
-    if (!isLoggedIn) return alert("Please log in to comment.");
-    if (!text.trim()) return;
-    await axios.post(
-      `/api/posts/${postId}/comments`,
-      { text },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
     const res = await axios.get<Post[]>(`/api/users/${id}/posts`);
     setPosts(res.data);
   };
@@ -317,7 +350,7 @@ const UserProfile: React.FC = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!data?.conversationId) throw new Error("No conversation id returned");
-      // after you get { conversationId } back
+      // After { conversationId } is retrieved
       navigate(`/messages/${data.conversationId}`, {
         state: {
           otherUser: {
@@ -336,7 +369,7 @@ const UserProfile: React.FC = () => {
     }
   };
 
-  // --- Pretty loading skeleton ---
+  // --- Pretty loading skeleton for list of posts ---
   const FeedLoading: React.FC<{ cards?: number }> = ({ cards = 3 }) => (
     <div aria-busy="true" aria-live="polite">
       {Array.from({ length: cards }).map((_, i) => (
@@ -610,7 +643,7 @@ const UserProfile: React.FC = () => {
     );
   };
 
-  // Drop-in TSX skeleton (looks like a real profile while loading)
+  // --- Pretty loading skeleton for hero info ---
   function ProfileLoadingSkeleton() {
     return (
       <div className="container">
@@ -677,7 +710,7 @@ const UserProfile: React.FC = () => {
     <div className="container" style={{ paddingTop: "56px" }}>
       <style>{styles}</style>
 
-      {/* HERO */}
+      {/* Hero */}
       <div className="hero-card card">
         <div className="hero-inner">
           <img
@@ -732,7 +765,7 @@ const UserProfile: React.FC = () => {
         </div>
       </div>
 
-      {/* POSTS */}
+      {/* Posts */}
       <h3 className="mb-3">Posts by {profileUser.username}</h3>
 
       {loadingPosts ? (
@@ -750,7 +783,7 @@ const UserProfile: React.FC = () => {
 
           return (
             <div key={post._id} className="card mb-4">
-              {/* header */}
+              {/* Header */}
               <div className="card-body d-flex align-items-start">
                 <Link
                   to={profileLink}
@@ -781,12 +814,12 @@ const UserProfile: React.FC = () => {
                 </Link>
               </div>
 
-              {/* text */}
+              {/* Text */}
               <div className="card-body text-start">
                 <p className="post-text">{post.description}</p>
               </div>
 
-              {/* image */}
+              {/* Image */}
               {post.imageUrl && (
                 <img
                   src={imgSrc(post.imageUrl)}
@@ -795,7 +828,7 @@ const UserProfile: React.FC = () => {
                 />
               )}
 
-              {/* reactions */}
+              {/* Reactions */}
               <div className="card-footer d-flex justify-content-between align-items-center">
                 <div>
                   <button
@@ -847,7 +880,7 @@ const UserProfile: React.FC = () => {
         })
       )}
 
-      {/* overlays */}
+      {/* Overlays */}
       {showFollowers && (
         <ListOverlay
           title="Followers"

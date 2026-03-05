@@ -1,4 +1,19 @@
-// backend/server.js
+/**
+ * Backend API server entrypoint.
+ *
+ * Responsibilities:
+ *   - Loads environment variables from backend/.env or backend/.env.development
+ *   - Configures CORS for the configured client origins and Vercel preview domains
+ *   - Enables JSON request parsing and serves static assets (uploads/ + public/)
+ *   - Attaches tenant/request-scoped database models via withModels (req.models)
+ *   - Mounts all /api route modules and exposes a basic health check
+ *
+ * Deployment notes:
+ *   - trust proxy is enabled for hosted environments (e.g., Render) to support
+ *     correct client IPs and secure cookie / HTTPS behavior behind a proxy.
+ *   - Preflight (OPTIONS) handling is implemented without wildcard routes to
+ *     remain compatible with Express 5.
+ */
 const path = require("path");
 const fs = require("fs");
 
@@ -16,7 +31,7 @@ if (!ENV_PATH) {
   console.log("[server] .env exists?", fs.existsSync(ENV_PATH));
   const firstBytes = fs.readFileSync(ENV_PATH).slice(0, 3);
   console.log("[server] First 3 bytes:", [...firstBytes]);
-  require("dotenv").config({ path: ENV_PATH /*, debug: true*/ });
+  require("dotenv").config({ path: ENV_PATH });
 }
 
 // Accept either key (multi.js supports both)
@@ -34,7 +49,7 @@ const ALLOWED = (process.env.CLIENT_ORIGIN || "")
   .map(s => s.trim())
   .filter(Boolean);
 
-// ★ Allow any Vercel preview subdomain (previews change every deploy)
+// Allow any Vercel preview subdomain (previews change every deploy)
 const isVercelPreview = (origin = "") => {
   try { return new URL(origin).host.endsWith(".vercel.app"); }
   catch { return false; }
@@ -42,12 +57,12 @@ const isVercelPreview = (origin = "") => {
 
 const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true);                 // curl/health checks
-    // ★ allow list OR any *.vercel.app preview
+    if (!origin) return cb(null, true);
+    // Allow list OR any *.vercel.app preview
     if (ALLOWED.includes(origin) || isVercelPreview(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS: " + origin), false);
   },
-  credentials: true, // ok even if you use JWT in JSON only
+  credentials: true,
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
   allowedHeaders: ["Content-Type","Authorization","X-Tenant"],
 };
@@ -55,7 +70,6 @@ const corsOptions = {
 // Always set ACAO for allowed origins (even on errors/404)
 app.use((req, res, next) => {
   const origin = req.headers.origin || "";
-  // ★ mirror the same rule here
   if (origin && (ALLOWED.includes(origin) || isVercelPreview(origin))) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
@@ -77,9 +91,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// DO NOT use: app.options("*", ...)  // <- this crashes on Express 5
-
-// Behind Render’s proxy (needed for secure cookies, correct IPs)
+// Behind Render's proxy (needed for secure cookies, correct IPs)
 app.set("trust proxy", 1);
 
 // ----- Body parsing AFTER CORS -----

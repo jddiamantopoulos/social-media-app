@@ -1,4 +1,24 @@
-// scripts/fixConvoIndex.js
+/**
+ * Conversation collection index repair script.
+ *
+ * Purpose:
+ *   - Connects to MongoDB using the configured MONGO_URI
+ *   - Inspects existing indexes on the "conversations" collection
+ *   - Removes the legacy "key_1" index if present
+ *   - Recreates a partial unique index on the "key" field
+ *   - Enforces uniqueness only for documents where key is a string
+ *
+ * Use Case:
+ *   - Migrates legacy or corrupted indexes
+ *   - Prevents duplicate conversation keys
+ *   - Safely handles documents with missing or non-string keys
+ *
+ * Usage:
+ *   node scripts/fixConvoIndex.js
+ *
+ * Environment:
+ *   - Requires MONGO_URI to be set in .env or environment variables
+ */
 const mongoose = require("mongoose");
 
 (async () => {
