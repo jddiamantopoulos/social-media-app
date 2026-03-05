@@ -151,8 +151,8 @@ VITE_API_URL=http://localhost:5000
 Clone the repository:
 
 ```
-git clone https://github.com/yourusername/cyberscape.git
-cd cyberscape
+git clone https://github.com/jddiamantopoulos/social-media-app.git
+cd social-media-app
 ```
 
 ---
