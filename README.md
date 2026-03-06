@@ -18,6 +18,28 @@ Hosted separately as an Express API.
 
 ---
 
+# Screenshots
+
+## Home Feed
+![Home Feed](screenshots/home-page.png)
+
+## Create Post
+![Create Post](screenshots/create-post.png)
+
+## Comments
+![Comments](screenshots/comments-page.png)
+
+## Messaging
+![Messaging](screenshots/message-thread.png)
+
+## User Profile
+![User Profile](screenshots/profile-page.png)
+
+## Sign-Up
+![Login](screenshots/signup-page.png)
+
+---
+
 # Features
 
 ## Authentication
