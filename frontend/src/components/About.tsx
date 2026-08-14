@@ -65,7 +65,7 @@ const About: React.FC = () => {
             About CyberScape and Its Creator
           </h1>
           <p className="lead">
-            Hello! I'm Jonathan Diamantopoulos, a junior Computer Science student at
+            Hello! I'm Jonathan Diamantopoulos, a senior Computer Science student at
             ASU's Barrett, The Honors College. I designed and built CyberScape to gain
             hands-on experience developing a full-stack web application from concept
             to deployment.
